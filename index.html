@@ -107,6 +107,24 @@ tr.dragover td{background:#fff8f1}
 .moedas{font-size:12.5px;line-height:1.6;white-space:nowrap}
 .moedas .brl{font-weight:800}
 
+.rel-topo{display:flex;align-items:center;gap:12px;border-bottom:2px solid #111;padding-bottom:5mm;margin-bottom:5mm}
+.rel-topo img{height:12mm}
+.rel-topo .tit{margin-left:auto;text-align:right}
+.rel-topo .tit b{font-size:12pt}
+.rel-topo .tit div{font-size:8.5pt;color:#666}
+.rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm;flex:1;align-content:start}
+.rel-item{border:1px solid #dcdee1;border-radius:3mm;padding:3mm;display:flex;gap:3mm;min-height:31mm}
+.rel-item .f{width:28mm;height:28mm;flex:0 0 28mm;border-radius:2mm;background:#f7f8f9;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.rel-item .f img{max-width:100%;max-height:100%;object-fit:contain}
+.rel-item .d{flex:1;font-size:8.5pt;line-height:1.45;min-width:0}
+.rel-item .d .nm{font-weight:800;font-size:9.5pt;margin-bottom:1mm}
+.rel-item .d .cd{font-family:monospace;color:#555}
+.rel-item .d .setor{display:inline-block;color:#fff;border-radius:99px;padding:.4mm 2.5mm;font-size:7pt;font-weight:800}
+.rel-item .d table{width:100%;border:0;margin-top:1mm;font-size:8pt}
+.rel-item .d td{border:0;padding:.3mm 0}
+.rel-item .d td:last-child{text-align:right;font-weight:800}
+
 .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
 .galeria .g-item.capa{border-color:var(--laranja)}
@@ -263,6 +281,7 @@ tr.dragover td{background:#fff8f1}
   <div class="cx">
     <img class="logo" alt="MIASHOP">
     <p>Estoque e Distribuição — Importados da China</p>
+    <div class="campo"><label>Usuário (opcional)</label><input type="text" id="usuarioLogin" placeholder="deixe vazio para senha master"></div>
     <div class="campo"><label>Senha</label><input type="password" id="senhaLogin" placeholder="Digite a senha"></div>
     <button class="btn principal" style="width:100%;justify-content:center" onclick="entrar()">Entrar</button>
   </div>
@@ -275,6 +294,7 @@ tr.dragover td{background:#fff8f1}
     <div class="sub">Centro de Distribuição <b>•</b> Importados da China</div>
     <div class="espaco"></div>
     <div class="pill"><span class="ponto" id="statusPonto"></span><span id="statusTexto">Conectando…</span></div>
+    <div class="pill" title="Usuário conectado">👤 <span id="usuarioAtivo">—</span></div>
     <button class="btn mini" onclick="sincronizar()">↻ Atualizar</button>
     <button class="btn mini" id="btnConfig" title="Configurações, filiais e conexão" onclick="abrirConfig()"
       style="padding:6px 9px" aria-label="Configurações">
@@ -307,6 +327,7 @@ tr.dragover td{background:#fff8f1}
     <button class="btn" onclick="abrirLotes()">Importações realizadas</button>
     <div class="espaco"></div>
     <button class="btn" onclick="exportarCsvProdutos()">Exportar CSV</button>
+    <button class="btn" onclick="exportarPdfProdutos()">Exportar PDF</button>
   </div>
   <input type="file" id="arqXml" accept=".xml" hidden multiple>
   <input type="file" id="arqExcel" accept=".xlsx,.xls" hidden>
@@ -601,6 +622,43 @@ tr.dragover td{background:#fff8f1}
     </div>
   </div>
 
+  <div class="duas" style="margin-top:18px">
+    <div class="card card-pad">
+      <h3 style="margin-bottom:12px">Usuários do sistema</h3>
+      <div class="tabela-wrap" style="max-height:280px;margin-bottom:14px">
+        <table><thead><tr><th>Usuário</th><th>Nome</th><th>Situação</th><th class="num" style="width:90px"></th></tr></thead>
+          <tbody id="tbUsuarios"></tbody></table>
+      </div>
+      <input type="hidden" id="usuId">
+      <div class="grid g2">
+        <div class="campo"><label>Usuário (login)</label><input type="text" id="usuLogin" placeholder="ex.: maria"></div>
+        <div class="campo"><label>Nome completo</label><input type="text" id="usuNome"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Senha</label><input type="password" id="usuSenha" placeholder="deixe vazio p/ manter"></div>
+        <div class="campo"><label>Situação</label>
+          <select id="usuAtivo"><option value="SIM">Ativo</option><option value="NAO">Bloqueado</option></select></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn principal" onclick="salvarUsuario()">Salvar usuário</button>
+        <button class="btn" onclick="limparFormUsuario()">Limpar</button>
+      </div>
+    </div>
+    <div class="card card-pad">
+      <h3 style="margin-bottom:12px">Senha master</h3>
+      <p style="color:var(--cinza);font-size:12.5px;line-height:1.6;margin:0 0 14px">
+        A senha master entra no sistema mesmo sem usuário e é a única que libera a troca de senha.
+        Guarde-a bem: se for perdida, só dá para recuperar dentro do Apps Script.
+      </p>
+      <div class="campo"><label>Senha master atual</label><input type="password" id="mstAtual"></div>
+      <div class="grid g2">
+        <div class="campo"><label>Nova senha</label><input type="password" id="mstNova"></div>
+        <div class="campo"><label>Repita a nova senha</label><input type="password" id="mstNova2"></div>
+      </div>
+      <button class="btn principal" onclick="alterarSenhaMaster()">Alterar senha master</button>
+    </div>
+  </div>
+
   <h3 style="margin:24px 0 12px;font-size:15px">Filiais da Miashop</h3>
 <div class="duas">
     <div class="card">
@@ -728,6 +786,15 @@ tr.dragover td{background:#fff8f1}
   </div>
 </div>
 
+<div class="modal" id="modalListaPdf">
+  <div class="modal-cx largo" style="max-width:1080px">
+    <div class="modal-topo"><h3>Relação de produtos</h3><div class="espaco"></div>
+      <button class="btn laranja" onclick="window.print()">Imprimir / Salvar em PDF</button>
+      <button class="fechar" onclick="fechar('modalListaPdf')">×</button></div>
+    <div class="modal-corpo" style="background:#eceef1"><div id="listaPdfArea"></div></div>
+  </div>
+</div>
+
 <div class="modal" id="modalMassa">
   <div class="modal-cx">
     <div class="modal-topo"><h3>Editar produtos selecionados</h3><div class="espaco"></div>
@@ -828,13 +895,14 @@ const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAArwAAADQCAYAAADlE7JL
 
 const CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbxk0S6uM-7Ho6BnLbciNYnY6tCwrWqbCcc_Q1Rn18ooOoPlsASLluKQfKF6ZfwMHm3L5Q/exec',
-  SENHA:   'HERA'
+  SENHA:   '',      // preenchido no login
+  USUARIO: ''
 };
 
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            usuarios:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
             urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
@@ -873,7 +941,7 @@ async function api(action, payload){
   if(!CONFIG.API_URL) throw new Error('URL do App Script não configurada (aba Configurações).');
   const r = await fetch(CONFIG.API_URL, {
     method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, redirect:'follow',
-    body: JSON.stringify({action, payload: payload||{}, senha: CONFIG.SENHA})
+    body: JSON.stringify({action, payload: payload||{}, senha: CONFIG.SENHA, usuario: CONFIG.USUARIO||''})
   });
   const j = await r.json();
   if(!j.ok) throw new Error(j.error||'Erro na API');
@@ -896,6 +964,7 @@ async function sincronizar(silencioso){
     S.transferencias = d.transferencias||[]; S.itens = d.itens||[];
     S.financeiro = d.financeiro||[]; S.config = d.config||{};
     S.emprestimos = d.emprestimos||[]; S.pagamentosBanco = d.pagamentosBanco||[];
+    S.usuarios = d.usuarios||[];
     S.urlPlanilha = d.urlPlanilha||''; S.urlPasta = d.urlPasta||'';
     statusConexao(true);
     renderTudo();
@@ -905,14 +974,26 @@ async function sincronizar(silencioso){
 }
 
 /* ============================== LOGIN ============================== */
-function entrar(){
-  if($('senhaLogin').value.trim().toUpperCase() !== CONFIG.SENHA.toUpperCase()){
-    toast('Senha incorreta.','erro'); return;
+async function entrar(){
+  const senha = $('senhaLogin').value.trim();
+  const usuario = $('usuarioLogin').value.trim();
+  if(!senha){ toast('Digite a senha.','erro'); return; }
+  const anterior = {s:CONFIG.SENHA, u:CONFIG.USUARIO};
+  CONFIG.SENHA = senha; CONFIG.USUARIO = usuario;
+  try{
+    carregando(true,'Verificando acesso…');
+    await api('ping');
+    $('login').style.display='none';
+    $('usuarioAtivo').textContent = usuario ? usuario : 'master';
+    carregando(false);
+    sincronizar();
+  }catch(e){
+    CONFIG.SENHA = anterior.s; CONFIG.USUARIO = anterior.u;
+    carregando(false);
+    toast(String(e.message).includes('inválid') ? 'Usuário ou senha inválidos.' : ('Erro: '+e.message),'erro');
   }
-  $('login').style.display='none';
-  sincronizar();
 }
-$('senhaLogin').addEventListener('keydown', e=>{ if(e.key==='Enter') entrar(); });
+['senhaLogin','usuarioLogin'].forEach(id=>$(id).addEventListener('keydown', e=>{ if(e.key==='Enter') entrar(); }));
 
 /* ============================== ABAS ============================== */
 document.querySelectorAll('nav button').forEach(b=>{
@@ -933,7 +1014,7 @@ function abrirConfig(){
 /* ============================ RENDER GERAL ========================= */
 function renderTudo(){
   renderProdutos(); renderFiliais(); renderSelects(); renderTransferencias();
-  renderFinanceiro(); renderRelatorios(); renderConfig(); renderCarrinho();
+  renderFinanceiro(); renderRelatorios(); renderConfig(); renderUsuarios(); renderCarrinho();
   if(window.renderFinanciamento) renderFinanciamento();
   if(window.renderCatalogo) renderCatalogo();
 }
@@ -2098,6 +2179,107 @@ async function testarConexao(){
     statusConexao(true); toast('Conexão OK.','ok'); await sincronizar(true);
   }catch(e){ statusConexao(false); toast('Falhou: '+e.message,'erro'); } finally{ carregando(false); }
 }
+/* ---------------------------- USUÁRIOS ----------------------------- */
+function renderUsuarios(){
+  $('tbUsuarios').innerHTML = S.usuarios.length ? S.usuarios.map(u=>`
+    <tr>
+      <td><b>${esc(u.usuario)}</b></td>
+      <td>${esc(u.nome||'')}</td>
+      <td>${String(u.ativo).toUpperCase()==='NAO'?'<span class="tag venc">BLOQUEADO</span>':'<span class="tag ok">ATIVO</span>'}</td>
+      <td class="num">
+        <button class="btn mini" onclick="editarUsuario('${u.id}')">Editar</button>
+        <button class="btn mini perigo" onclick="excluirUsuario('${u.id}')">×</button>
+      </td></tr>`).join('')
+    : '<tr><td colspan="4"><div class="vazio">Nenhum usuário. Só a senha master entra no sistema.</div></td></tr>';
+}
+function limparFormUsuario(){
+  ['usuId','usuLogin','usuNome','usuSenha'].forEach(i=>$(i).value=''); $('usuAtivo').value='SIM';
+}
+function editarUsuario(id){
+  const u = S.usuarios.find(x=>x.id===id); if(!u) return;
+  $('usuId').value=u.id; $('usuLogin').value=u.usuario||''; $('usuNome').value=u.nome||'';
+  $('usuSenha').value=''; $('usuAtivo').value=String(u.ativo).toUpperCase()==='NAO'?'NAO':'SIM';
+}
+async function salvarUsuario(){
+  const usuario = { id:$('usuId').value||'', usuario:$('usuLogin').value.trim(),
+    nome:$('usuNome').value.trim(), senha:$('usuSenha').value.trim(), ativo:$('usuAtivo').value };
+  if(!usuario.usuario){ toast('Informe o usuário.','erro'); return; }
+  if(!usuario.id && !usuario.senha){ toast('Informe a senha do novo usuário.','erro'); return; }
+  try{
+    carregando(true,'Salvando usuário…');
+    const salvo = await api('salvarUsuario',{usuario});
+    const i = S.usuarios.findIndex(x=>x.id===salvo.id);
+    if(i>=0) S.usuarios[i]=salvo; else S.usuarios.push(salvo);
+    S.versao=''; limparFormUsuario(); renderUsuarios(); toast('Usuário salvo.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+async function excluirUsuario(id){
+  const u = S.usuarios.find(x=>x.id===id);
+  if(!confirm('Excluir o acesso de '+(u?u.usuario:'')+'?')) return;
+  try{ carregando(true,'Excluindo…'); await api('excluirUsuario',{id});
+    S.usuarios = S.usuarios.filter(x=>x.id!==id); S.versao=''; renderUsuarios(); toast('Usuário excluído.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+async function alterarSenhaMaster(){
+  const atual=$('mstAtual').value.trim(), nova=$('mstNova').value.trim(), nova2=$('mstNova2').value.trim();
+  if(!atual || !nova){ toast('Preencha a senha atual e a nova.','erro'); return; }
+  if(nova!==nova2){ toast('A nova senha e a repetição não conferem.','erro'); return; }
+  if(nova.length<4){ toast('A nova senha precisa ter ao menos 4 caracteres.','erro'); return; }
+  try{
+    carregando(true,'Alterando senha master…');
+    await api('alterarSenhaMaster',{senhaAtual:atual, novaSenha:nova});
+    if(CONFIG.SENHA===atual) CONFIG.SENHA = nova;   // mantém a sessão aberta
+    ['mstAtual','mstNova','mstNova2'].forEach(i=>$(i).value='');
+    toast('Senha master alterada.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+/* ------------------- RELAÇÃO DE PRODUTOS EM PDF -------------------- */
+function exportarPdfProdutos(){
+  const lista = S.selProdutos.length
+    ? S.produtos.filter(p=>S.selProdutos.includes(p.id))
+    : produtosFiltrados();
+  if(!lista.length){ toast('Nenhum produto para exportar.','erro'); return; }
+
+  const porPagina = 8;
+  const paginas = [];
+  for(let i=0;i<lista.length;i+=porPagina){
+    const bloco = lista.slice(i,i+porPagina);
+    const pg = Math.floor(i/porPagina)+1, total = Math.ceil(lista.length/porPagina);
+    paginas.push(`<div class="pagina" style="padding:11mm">
+      <div class="rel-topo">
+        <img src="${LOGO}" alt="MIASHOP">
+        <div class="tit"><b>Relação de produtos — Centro de Distribuição</b>
+          <div>${lista.length} produto(s) • emitido em ${dataBR(hoje())} • página ${pg}/${total}</div></div>
+      </div>
+      <div class="rel-grid">${bloco.map(itemRelatorioPdf).join('')}</div>
+    </div>`);
+  }
+  $('listaPdfArea').innerHTML = paginas.join('');
+  abrir('modalListaPdf');
+  toast(lista.length+' produto(s) em '+paginas.length+' página(s).','ok');
+}
+function itemRelatorioPdf(p){
+  const foto = fotosDoProduto(p)[0];
+  const setor = (typeof setorDe==='function') ? setorDe(p) : (p.setor||'Diversos');
+  const cor = (typeof corSetor==='function') ? corSetor(setor) : '#F18634';
+  return `<div class="rel-item">
+    <div class="f">${foto?`<img src="${fotoGrande(foto)}">`:'<span style="color:#bbb;font-size:7pt;font-weight:800">SEM FOTO</span>'}</div>
+    <div class="d">
+      <div class="nm">${esc(p.descricao)}</div>
+      <div class="cd">${esc(p.codigo)}${p.skiwayItem?(' • SKIWAY '+esc(p.skiwayItem)):''}</div>
+      <div style="margin:.8mm 0"><span class="setor" style="background:${cor}">${esc(setor)}</span></div>
+      <table>
+        <tr><td>Estoque</td><td>${inteiro(p.quantidade)} un</td></tr>
+        <tr><td>Vendido</td><td>${inteiro(vendidoDoProduto(p))} un</td></tr>
+        <tr><td>Custo China</td><td>${moeda(p.custoChina)}</td></tr>
+        <tr><td>Venda Miashop</td><td>${moeda(p.precoVenda)}</td></tr>
+        ${p.codigoBarras?`<tr><td>EAN</td><td>${esc(p.codigoBarras)}</td></tr>`:''}
+      </table>
+    </div>
+  </div>`;
+}
+
 function exportarBackup(){
   baixarArquivo('miashop-cd-backup-'+hoje()+'.json', JSON.stringify({
     produtos:S.produtos, filiais:S.filiais, transferencias:S.transferencias,
