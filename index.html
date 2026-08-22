@@ -101,6 +101,12 @@ tbody tr:hover{background:#fafbfc}
 .foto-cel.dragover{border-color:var(--laranja);background:#fff4e9;border-style:solid}
 tr.dragover td{background:#fff8f1}
 
+.cambio{font-size:12px;font-weight:700;color:var(--cinza);background:#fbfbfc;border:1px solid var(--linha);
+  border-radius:8px;padding:8px 11px;margin-bottom:12px;line-height:1.7}
+.cambio b{color:var(--tinta)}
+.moedas{font-size:12.5px;line-height:1.6;white-space:nowrap}
+.moedas .brl{font-weight:800}
+
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;
   z-index:90;padding:20px;backdrop-filter:blur(2px)}
@@ -228,9 +234,7 @@ tr.dragover td{background:#fff8f1}
     <button class="btn" onclick="arqXml.click()">Importar XML</button>
     <button class="btn" onclick="arqExcel.click()">Importar Excel do pedido</button>
     <div class="espaco"></div>
-    <button class="btn" onclick="gerarEansFaltantes()">Gerar EAN faltantes</button>
-    <button class="btn laranja" onclick="exportarXmlShop9()">Exportar XML p/ Shop9</button>
-    <button class="btn" onclick="exportarCsvProdutos()">CSV</button>
+    <button class="btn" onclick="exportarCsvProdutos()">Exportar CSV</button>
   </div>
   <input type="file" id="arqXml" accept=".xml" hidden multiple>
   <input type="file" id="arqExcel" accept=".xlsx,.xls" hidden>
@@ -377,15 +381,16 @@ tr.dragover td{background:#fff8f1}
         <div class="campo"><label>Data</label><input type="date" id="empData"></div>
         <div class="campo"><label>Banco / instituição</label><input type="text" id="empBanco" placeholder="Ex.: Banco XYZ"></div>
       </div>
-      <div class="grid g2">
-        <div class="campo"><label>Moeda</label>
-          <select id="empMoeda">
-            <option value="BRL">Real (R$)</option>
-            <option value="USD">Dólar (US$)</option>
-            <option value="CHF">Franco suíço (CHF)</option>
-          </select></div>
-        <div class="campo"><label>Valor emprestado</label><input type="number" id="empValor" step="0.01" placeholder="0,00"></div>
+      <label>Valor do empréstimo nas três moedas</label>
+      <div class="grid g3" style="margin-bottom:6px">
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Real (R$)</label>
+          <input type="number" id="empBrl" step="0.01" placeholder="0,00"></div>
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Dólar (US$)</label>
+          <input type="number" id="empUsd" step="0.01" placeholder="0,00"></div>
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Franco suíço (CHF)</label>
+          <input type="number" id="empChf" step="0.01" placeholder="0,00"></div>
       </div>
+      <div id="cambioEmp" class="cambio"></div>
       <div class="campo"><label>Descrição / finalidade</label><input type="text" id="empDescricao" placeholder="Ex.: pagamento do pedido SKIWAY"></div>
       <div style="display:flex;gap:10px">
         <button class="btn principal" onclick="salvarEmprestimo()">Salvar empréstimo</button>
@@ -400,26 +405,33 @@ tr.dragover td{background:#fff8f1}
         <select id="pgEmprestimo"><option value="">Selecione o empréstimo…</option></select></div>
       <div class="grid g2">
         <div class="campo"><label>Data do pagamento</label><input type="date" id="pgData"></div>
-        <div class="campo"><label>Valor pago</label><input type="number" id="pgValor" step="0.01" placeholder="0,00"></div>
-      </div>
-      <div class="grid g2">
         <div class="campo"><label>Forma</label>
           <select id="pgForma"><option>Transferência</option><option>PIX</option><option>Boleto</option>
             <option>Débito em conta</option><option>Câmbio</option><option>Dinheiro</option></select></div>
-        <div class="campo"><label>Observação</label><input type="text" id="pgObs"></div>
       </div>
+      <label>Valor pago nas três moedas</label>
+      <div class="grid g3" style="margin-bottom:6px">
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Real (R$)</label>
+          <input type="number" id="pgBrl" step="0.01" placeholder="0,00"></div>
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Dólar (US$)</label>
+          <input type="number" id="pgUsd" step="0.01" placeholder="0,00"></div>
+        <div class="campo"><label style="text-transform:none;letter-spacing:0">Franco suíço (CHF)</label>
+          <input type="number" id="pgChf" step="0.01" placeholder="0,00"></div>
+      </div>
+      <div id="cambioPg" class="cambio"></div>
+      <div class="campo"><label>Observação</label><input type="text" id="pgObs"></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button class="btn laranja" onclick="salvarPagamentoBanco()">Lançar pagamento</button>
         <button class="btn" onclick="limparFormPagamento()">Limpar</button>
-        <span id="saldoSelecionado" style="font-size:12.5px;color:var(--cinza);font-weight:700"></span>
       </div>
+      <div id="saldoSelecionado" style="font-size:12.5px;color:var(--cinza);font-weight:700;margin-top:10px"></div>
     </div>
 
     <div>
       <div class="card" style="margin-bottom:18px">
         <div class="card-pad" style="border-bottom:1px solid var(--linha)"><h3 style="font-size:14px">Empréstimos e saldo devedor</h3></div>
         <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
-          <table><thead><tr><th>Data</th><th>Banco</th><th>Moeda</th><th class="num">Emprestado</th>
+          <table><thead><tr><th>Data</th><th>Banco</th><th class="num">Emprestado</th><th>Câmbio do dia</th>
             <th class="num">Pago</th><th class="num">Saldo devedor</th><th class="num" style="width:110px">Ações</th></tr></thead>
           <tbody id="tbEmprestimos"></tbody><tfoot id="tfEmprestimos"></tfoot></table>
         </div>
@@ -430,7 +442,7 @@ tr.dragover td{background:#fff8f1}
           <select id="fPgEmprestimo" style="width:230px"><option value="">Todos os empréstimos</option></select>
         </div>
         <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
-          <table><thead><tr><th>Data</th><th>Banco / empréstimo</th><th>Forma</th><th>Obs.</th>
+          <table><thead><tr><th>Data</th><th>Banco / empréstimo</th><th>Forma</th><th>Câmbio do dia</th>
             <th class="num">Valor pago</th><th class="num" style="width:70px"></th></tr></thead>
           <tbody id="tbPagamentosBanco"></tbody><tfoot id="tfPagamentosBanco"></tfoot></table>
         </div>
@@ -926,20 +938,6 @@ function novoEan(){
     if(seq>99999) return '';
   }
 }
-async function gerarEansFaltantes(){
-  const faltam = S.produtos.filter(p=>!String(p.codigoBarras||'').trim());
-  if(!faltam.length){ toast('Todos os produtos já têm código de barras.'); return; }
-  if(!confirm('Gerar código de barras EAN-13 para '+faltam.length+' produto(s)?')) return;
-  try{
-    carregando(true,'Gerando códigos de barras…');
-    for(const p of faltam){
-      p.codigoBarras = novoEan();
-      await api('salvarProduto',{produto:p});
-    }
-    renderProdutos(); toast(faltam.length+' código(s) gerado(s).','ok');
-  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
-}
-
 /* ========================== IMPORTAR XML =========================== */
 $('arqXml').onchange = async e=>{
   const arquivos = [...e.target.files]; e.target.value='';
@@ -1035,24 +1033,36 @@ function baixarArquivo(nome, conteudo, tipo){
   const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = nome;
   a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
 }
-function exportarXmlShop9(){
-  const lista = produtosFiltrados();
-  if(!lista.length){ toast('Nada para exportar.','erro'); return; }
-  const x = ['<?xml version="1.0" encoding="UTF-8"?>','<produtos gerado="'+hoje()+'" origem="MIASHOP CD China">'];
-  lista.forEach(p=>{
-    x.push('  <produto>');
-    x.push('    <codigo>'+esc(p.codigo)+'</codigo>');
-    x.push('    <descricao>'+esc(p.descricao)+'</descricao>');
-    x.push('    <codigobarras>'+esc(p.codigoBarras||'')+'</codigobarras>');
-    x.push('    <unidade>'+esc(p.unidade||'UN')+'</unidade>');
-    x.push('    <ncm>'+esc(p.ncm||'')+'</ncm>');
-    x.push('    <custo>'+num(p.custoChina).toFixed(2)+'</custo>');
-    x.push('    <preco>'+num(p.precoVenda).toFixed(2)+'</preco>');
-    x.push('    <quantidade>'+num(p.quantidade)+'</quantidade>');
-    x.push('  </produto>');
+function exportarXmlTransferencia(id){
+  const t = S.transferencias.find(x=>x.id===id); if(!t) return;
+  const itens = S.itens.filter(i=>String(i.transferenciaId)===String(t.id));
+  if(!itens.length){ toast('Transferência sem itens.','erro'); return; }
+  const x = ['<?xml version="1.0" encoding="UTF-8"?>',
+    '<transferencia numero="'+esc(t.numero)+'" data="'+iso(t.data)+'" origem="MIASHOP CD China">',
+    '  <destino>',
+    '    <filial>'+esc(t.filialNome)+'</filial>',
+    '    <cnpj>'+esc(t.filialCnpj||'')+'</cnpj>',
+    '  </destino>',
+    '  <produtos>'];
+  itens.forEach(i=>{
+    const p = S.produtos.find(y=>String(y.id)===String(i.produtoId)) || {};
+    x.push('    <produto>');
+    x.push('      <codigo>'+esc(i.codigo)+'</codigo>');
+    x.push('      <descricao>'+esc(i.descricao)+'</descricao>');
+    x.push('      <codigobarras>'+esc(i.codigoBarras||'')+'</codigobarras>');
+    x.push('      <unidade>'+esc(p.unidade||'UN')+'</unidade>');
+    x.push('      <ncm>'+esc(p.ncm||'')+'</ncm>');
+    x.push('      <quantidade>'+num(i.quantidade)+'</quantidade>');
+    x.push('      <custo>'+num(p.custoChina).toFixed(2)+'</custo>');
+    x.push('      <preco>'+num(i.precoUnit).toFixed(2)+'</preco>');
+    x.push('      <total>'+num(i.total).toFixed(2)+'</total>');
+    x.push('    </produto>');
   });
-  x.push('</produtos>');
-  baixarArquivo('miashop-produtos-shop9-'+hoje()+'.xml', x.join('\n'), 'application/xml');
+  x.push('  </produtos>');
+  x.push('  <totais><itens>'+num(t.qtdItens)+'</itens><valor>'+num(t.valorTotal).toFixed(2)+'</valor></totais>');
+  x.push('</transferencia>');
+  baixarArquivo('miashop-transf-'+t.numero+'-shop9.xml', x.join('\n'), 'application/xml');
+  toast('XML da transferência '+t.numero+' gerado.','ok');
 }
 function csv(linhas){ return '\uFEFF'+linhas.map(l=>l.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n'); }
 function exportarCsvProdutos(){
@@ -1348,6 +1358,7 @@ function renderTransferencias(){
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn mini" onclick="verRecibo('${t.id}')">Ver recibo</button>
+        <button class="btn mini" onclick="exportarXmlTransferencia('${t.id}')">XML p/ Shop9</button>
         <button class="btn mini perigo" onclick="excluirTransferencia('${t.id}')">Cancelar</button>
       </div>
     </div>`).join('')
@@ -1682,129 +1693,173 @@ function exportarBackup(){
 })();
 </script>
 <script>
-/* ========================== FINANCIAMENTO ========================== */
-const MOEDAS = { BRL:{simbolo:'R$', nome:'Real', loc:'pt-BR', cur:'BRL'},
-                 USD:{simbolo:'US$', nome:'Dólar', loc:'en-US', cur:'USD'},
-                 CHF:{simbolo:'CHF', nome:'Franco suíço', loc:'de-CH', cur:'CHF'} };
-function valorMoeda(v, m){
-  const info = MOEDAS[m] || MOEDAS.BRL;
-  return info.simbolo+' '+num(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-}
-function pagoDoEmprestimo(id){
-  return S.pagamentosBanco.filter(g=>String(g.emprestimoId)===String(id)).reduce((a,g)=>a+num(g.valor),0);
-}
-function saldoDoEmprestimo(e){ return num(e.valor) - pagoDoEmprestimo(e.id); }
+/* ========================== FINANCIAMENTO ==========================
+   Cada empréstimo e cada pagamento é registrado nas TRÊS moedas.
+   Assim fica gravado o câmbio do dia da operação e o saldo devedor
+   é acompanhado separadamente em R$, US$ e CHF.                     */
+const MOEDAS = { BRL:{simbolo:'R$', nome:'Real', campo:'valorBrl'},
+                 USD:{simbolo:'US$', nome:'Dólar', campo:'valorUsd'},
+                 CHF:{simbolo:'CHF', nome:'Franco suíço', campo:'valorChf'} };
+const ORDEM_MOEDAS = ['BRL','USD','CHF'];
 
+function valorMoeda(v, m){
+  return MOEDAS[m].simbolo+' '+num(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function taxa(v){ return num(v).toLocaleString('pt-BR',{minimumFractionDigits:4, maximumFractionDigits:4}); }
+function tresValores(o){ return {BRL:num(o.valorBrl), USD:num(o.valorUsd), CHF:num(o.valorChf)}; }
+function blocoValores(o){
+  const v = tresValores(o);
+  return `<div class="moedas"><span class="brl">${valorMoeda(v.BRL,'BRL')}</span><br>
+    ${valorMoeda(v.USD,'USD')}<br>${valorMoeda(v.CHF,'CHF')}</div>`;
+}
+function cambioTexto(o, curto){
+  const v = tresValores(o);
+  if(!v.USD && !v.CHF) return '<span style="color:var(--cinza-claro)">—</span>';
+  const l = [];
+  if(v.USD) l.push('US$ 1 = R$ '+taxa(v.BRL/v.USD));
+  if(v.CHF) l.push('CHF 1 = R$ '+taxa(v.BRL/v.CHF));
+  if(v.USD && v.CHF && !curto) l.push('US$ 1 = CHF '+taxa(v.CHF/v.USD));
+  return '<div class="moedas" style="font-size:12px">'+l.join('<br>')+'</div>';
+}
+
+function pagoDoEmprestimo(id){
+  const p = {BRL:0, USD:0, CHF:0};
+  S.pagamentosBanco.filter(g=>String(g.emprestimoId)===String(id)).forEach(g=>{
+    const v = tresValores(g); ORDEM_MOEDAS.forEach(m=> p[m]+=v[m]);
+  });
+  return p;
+}
+function saldoDoEmprestimo(e){
+  const v = tresValores(e), pg = pagoDoEmprestimo(e.id), s = {};
+  ORDEM_MOEDAS.forEach(m=> s[m] = v[m]-pg[m]);
+  return s;
+}
+function quitado(saldo){ return ORDEM_MOEDAS.every(m=> saldo[m] <= 0.004); }
+
+/* ---- câmbio ao vivo nos formulários ---- */
+function atualizarCambio(prefixo, alvo){
+  const o = { valorBrl:$(prefixo+'Brl').value, valorUsd:$(prefixo+'Usd').value, valorChf:$(prefixo+'Chf').value };
+  const v = tresValores(o);
+  if(!v.BRL || (!v.USD && !v.CHF)){
+    $(alvo).innerHTML = 'Preencha as três moedas para registrar o câmbio do dia.';
+    return;
+  }
+  const l = [];
+  if(v.USD) l.push('US$ 1 = <b>R$ '+taxa(v.BRL/v.USD)+'</b>');
+  if(v.CHF) l.push('CHF 1 = <b>R$ '+taxa(v.BRL/v.CHF)+'</b>');
+  if(v.USD && v.CHF) l.push('US$ 1 = <b>CHF '+taxa(v.CHF/v.USD)+'</b>');
+  $(alvo).innerHTML = 'Câmbio do dia: '+l.join(' &nbsp;•&nbsp; ');
+}
+['empBrl','empUsd','empChf'].forEach(id=>$(id).addEventListener('input', ()=>atualizarCambio('emp','cambioEmp')));
+['pgBrl','pgUsd','pgChf'].forEach(id=>$(id).addEventListener('input', ()=>atualizarCambio('pg','cambioPg')));
+
+/* ------------------------------ RENDER ----------------------------- */
 function renderFinanciamento(){
   const emps = [...S.emprestimos].sort((a,b)=> iso(b.data).localeCompare(iso(a.data)));
 
-  // KPIs por moeda
-  const porMoeda = {};
-  Object.keys(MOEDAS).forEach(m=> porMoeda[m] = {emprestado:0, pago:0});
+  const tot = {BRL:{e:0,p:0}, USD:{e:0,p:0}, CHF:{e:0,p:0}};
   S.emprestimos.forEach(e=>{
-    const m = MOEDAS[e.moeda] ? e.moeda : 'BRL';
-    porMoeda[m].emprestado += num(e.valor);
-    porMoeda[m].pago += pagoDoEmprestimo(e.id);
+    const v = tresValores(e), pg = pagoDoEmprestimo(e.id);
+    ORDEM_MOEDAS.forEach(m=>{ tot[m].e += v[m]; tot[m].p += pg[m]; });
   });
-  $('kpisFinanciamento').innerHTML = Object.keys(MOEDAS).map(m=>{
-    const d = porMoeda[m], saldo = d.emprestado - d.pago;
-    return `<div class="kpi ${saldo>0?'vermelho':'verde'}">
+  $('kpisFinanciamento').innerHTML = ORDEM_MOEDAS.map(m=>{
+    const saldo = tot[m].e - tot[m].p;
+    return `<div class="kpi ${saldo>0.004?'vermelho':'verde'}">
       <div class="rot">Saldo devedor • ${MOEDAS[m].nome}</div>
       <div class="val">${valorMoeda(saldo, m)}</div>
       <div style="font-size:11.5px;color:var(--cinza);margin-top:6px">
-        Tomado ${valorMoeda(d.emprestado,m)} • Pago ${valorMoeda(d.pago,m)}</div></div>`;
+        Tomado ${valorMoeda(tot[m].e,m)} • Pago ${valorMoeda(tot[m].p,m)}</div></div>`;
   }).join('');
 
-  // tabela de empréstimos
   $('tbEmprestimos').innerHTML = emps.length ? emps.map(e=>{
-    const pago = pagoDoEmprestimo(e.id), saldo = num(e.valor)-pago;
-    const m = MOEDAS[e.moeda] ? e.moeda : 'BRL';
+    const pg = pagoDoEmprestimo(e.id), saldo = saldoDoEmprestimo(e);
     return `<tr>
       <td>${dataBR(e.data)}</td>
       <td><b>${esc(e.banco||'—')}</b>${e.descricao?`<br><small style="color:var(--cinza)">${esc(e.descricao)}</small>`:''}</td>
-      <td><span class="tag aberto">${m}</span></td>
-      <td class="num">${valorMoeda(e.valor,m)}</td>
-      <td class="num">${valorMoeda(pago,m)}</td>
-      <td class="num"><b style="color:${saldo>0.004?'var(--vermelho)':'var(--verde)'}">${valorMoeda(saldo,m)}</b>
-        ${saldo<=0.004?'<br><span class="tag ok">QUITADO</span>':''}</td>
+      <td class="num">${blocoValores(e)}</td>
+      <td>${cambioTexto(e)}</td>
+      <td class="num">${blocoValores({valorBrl:pg.BRL, valorUsd:pg.USD, valorChf:pg.CHF})}</td>
+      <td class="num"><div style="color:${quitado(saldo)?'var(--verde)':'var(--vermelho)'}">
+        ${blocoValores({valorBrl:saldo.BRL, valorUsd:saldo.USD, valorChf:saldo.CHF})}</div>
+        ${quitado(saldo)?'<span class="tag ok">QUITADO</span>':''}</td>
       <td class="num">
         <button class="btn mini" onclick="editarEmprestimo('${e.id}')">Editar</button>
         <button class="btn mini perigo" onclick="excluirEmprestimo('${e.id}')">Excluir</button>
       </td></tr>`;
   }).join('')
-  : '<tr><td colspan="7"><div class="vazio"><b>Nenhum empréstimo lançado</b>Cadastre ao lado o valor tomado no banco.</div></td></tr>';
+  : '<tr><td colspan="7"><div class="vazio"><b>Nenhum empréstimo lançado</b>Cadastre ao lado o valor tomado no banco, nas três moedas.</div></td></tr>';
 
-  $('tfEmprestimos').innerHTML = Object.keys(MOEDAS).filter(m=>porMoeda[m].emprestado>0).map(m=>{
-    const d = porMoeda[m];
-    return `<tr style="background:#fafbfc"><td colspan="3" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL ${m}</td>
-      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${valorMoeda(d.emprestado,m)}</td>
-      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${valorMoeda(d.pago,m)}</td>
-      <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${valorMoeda(d.emprestado-d.pago,m)}</td>
-      <td style="border-top:2px solid var(--linha)"></td></tr>`;
-  }).join('');
+  $('tfEmprestimos').innerHTML = emps.length ? `<tr style="background:#fafbfc">
+      <td colspan="2" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL</td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">
+        ${blocoValores({valorBrl:tot.BRL.e, valorUsd:tot.USD.e, valorChf:tot.CHF.e})}</td>
+      <td style="border-top:2px solid var(--linha)"></td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">
+        ${blocoValores({valorBrl:tot.BRL.p, valorUsd:tot.USD.p, valorChf:tot.CHF.p})}</td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">
+        ${blocoValores({valorBrl:tot.BRL.e-tot.BRL.p, valorUsd:tot.USD.e-tot.USD.p, valorChf:tot.CHF.e-tot.CHF.p})}</td>
+      <td style="border-top:2px solid var(--linha)"></td></tr>` : '';
 
-  // selects de empréstimo
-  const ops = emps.map(e=>{
-    const m = MOEDAS[e.moeda]?e.moeda:'BRL';
-    return `<option value="${e.id}">${dataBR(e.data)} • ${esc(e.banco||'—')} • ${valorMoeda(e.valor,m)}</option>`;
-  }).join('');
+  const ops = emps.map(e=>`<option value="${e.id}">${dataBR(e.data)} • ${esc(e.banco||'—')} • ${valorMoeda(num(e.valorBrl),'BRL')}</option>`).join('');
   const sel1 = $('pgEmprestimo').value, sel2 = $('fPgEmprestimo').value;
   $('pgEmprestimo').innerHTML = '<option value="">Selecione o empréstimo…</option>'+ops;
   $('fPgEmprestimo').innerHTML = '<option value="">Todos os empréstimos</option>'+ops;
   $('pgEmprestimo').value = sel1; $('fPgEmprestimo').value = sel2;
   mostrarSaldoSelecionado();
 
-  // tabela de pagamentos
   const filtro = $('fPgEmprestimo').value;
   const pags = S.pagamentosBanco.filter(g=>!filtro || String(g.emprestimoId)===filtro)
     .sort((a,b)=> iso(b.data).localeCompare(iso(a.data)));
   $('tbPagamentosBanco').innerHTML = pags.length ? pags.map(g=>{
     const e = S.emprestimos.find(x=>String(x.id)===String(g.emprestimoId)) || {};
-    const m = MOEDAS[g.moeda] ? g.moeda : (MOEDAS[e.moeda]?e.moeda:'BRL');
     return `<tr>
       <td>${dataBR(g.data)}</td>
-      <td>${esc(e.banco||'—')}<br><small style="color:var(--cinza)">${e.data?('empréstimo de '+dataBR(e.data)):''}</small></td>
-      <td>${esc(g.forma||'')}</td><td>${esc(g.obs||'')}</td>
-      <td class="num"><b>${valorMoeda(g.valor,m)}</b></td>
+      <td>${esc(e.banco||'—')}<br><small style="color:var(--cinza)">${e.data?('empréstimo de '+dataBR(e.data)):''}${g.obs?(' • '+esc(g.obs)):''}</small></td>
+      <td>${esc(g.forma||'')}</td>
+      <td>${cambioTexto(g, true)}</td>
+      <td class="num">${blocoValores(g)}</td>
       <td class="num"><button class="btn mini perigo" onclick="excluirPagamentoBanco('${g.id}')">×</button></td></tr>`;
   }).join('')
   : '<tr><td colspan="6"><div class="vazio">Nenhum pagamento lançado.</div></td></tr>';
 
-  const totMoedas = {};
-  pags.forEach(g=>{ const e = S.emprestimos.find(x=>String(x.id)===String(g.emprestimoId))||{};
-    const m = MOEDAS[g.moeda]?g.moeda:(MOEDAS[e.moeda]?e.moeda:'BRL');
-    totMoedas[m] = (totMoedas[m]||0) + num(g.valor); });
-  $('tfPagamentosBanco').innerHTML = Object.keys(totMoedas).map(m=>`
-    <tr style="background:#fafbfc"><td colspan="4" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL PAGO ${m}</td>
-      <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${valorMoeda(totMoedas[m],m)}</td>
-      <td style="border-top:2px solid var(--linha)"></td></tr>`).join('');
+  const tp = {BRL:0, USD:0, CHF:0};
+  pags.forEach(g=>{ const v = tresValores(g); ORDEM_MOEDAS.forEach(m=> tp[m]+=v[m]); });
+  $('tfPagamentosBanco').innerHTML = pags.length ? `<tr style="background:#fafbfc">
+      <td colspan="4" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL PAGO</td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">
+        ${blocoValores({valorBrl:tp.BRL, valorUsd:tp.USD, valorChf:tp.CHF})}</td>
+      <td style="border-top:2px solid var(--linha)"></td></tr>` : '';
 }
 
 function mostrarSaldoSelecionado(){
   const e = S.emprestimos.find(x=>String(x.id)===$('pgEmprestimo').value);
-  if(!e){ $('saldoSelecionado').textContent=''; return; }
-  const m = MOEDAS[e.moeda]?e.moeda:'BRL';
-  $('saldoSelecionado').textContent = 'Saldo devedor deste empréstimo: '+valorMoeda(saldoDoEmprestimo(e), m);
+  if(!e){ $('saldoSelecionado').innerHTML=''; return; }
+  const s = saldoDoEmprestimo(e);
+  $('saldoSelecionado').innerHTML = 'Saldo devedor deste empréstimo: '+
+    ORDEM_MOEDAS.map(m=>`<b style="color:${s[m]>0.004?'var(--vermelho)':'var(--verde)'}">${valorMoeda(s[m],m)}</b>`).join(' &nbsp;•&nbsp; ');
 }
 $('pgEmprestimo').addEventListener('change', mostrarSaldoSelecionado);
 $('fPgEmprestimo').addEventListener('change', renderFinanciamento);
 
+/* ---------------------------- EMPRÉSTIMOS -------------------------- */
 function limparFormEmprestimo(){
-  ['empId','empBanco','empValor','empDescricao'].forEach(i=>$(i).value='');
-  $('empData').value = hoje(); $('empMoeda').value='BRL';
+  ['empId','empBanco','empBrl','empUsd','empChf','empDescricao'].forEach(i=>$(i).value='');
+  $('empData').value = hoje(); atualizarCambio('emp','cambioEmp');
 }
 function editarEmprestimo(id){
   const e = S.emprestimos.find(x=>x.id===id); if(!e) return;
   $('empId').value=e.id; $('empData').value=iso(e.data); $('empBanco').value=e.banco||'';
-  $('empMoeda').value = MOEDAS[e.moeda]?e.moeda:'BRL'; $('empValor').value=num(e.valor);
-  $('empDescricao').value=e.descricao||'';
+  $('empBrl').value=num(e.valorBrl)||''; $('empUsd').value=num(e.valorUsd)||''; $('empChf').value=num(e.valorChf)||'';
+  $('empDescricao').value=e.descricao||''; atualizarCambio('emp','cambioEmp');
   window.scrollTo({top:0, behavior:'smooth'});
 }
 async function salvarEmprestimo(){
   const emprestimo = { id:$('empId').value||'', data:$('empData').value||hoje(), banco:$('empBanco').value.trim(),
-    moeda:$('empMoeda').value, valor:num($('empValor').value), descricao:$('empDescricao').value.trim(), obs:'' };
+    valorBrl:num($('empBrl').value), valorUsd:num($('empUsd').value), valorChf:num($('empChf').value),
+    descricao:$('empDescricao').value.trim(), moeda:'', valor:num($('empBrl').value), obs:'' };
   if(!emprestimo.banco){ toast('Informe o banco.','erro'); return; }
-  if(emprestimo.valor<=0){ toast('Informe o valor emprestado.','erro'); return; }
+  if(emprestimo.valorBrl<=0 || emprestimo.valorUsd<=0 || emprestimo.valorChf<=0){
+    toast('Preencha o valor nas três moedas (R$, US$ e CHF).','erro'); return; }
   try{
     carregando(true,'Salvando empréstimo…');
     const salvo = await api('salvarEmprestimo',{emprestimo});
@@ -1815,7 +1870,7 @@ async function salvarEmprestimo(){
 }
 async function excluirEmprestimo(id){
   const e = S.emprestimos.find(x=>x.id===id);
-  if(!confirm('Excluir o empréstimo de '+esc(e.banco)+'? Os pagamentos vinculados também serão apagados.')) return;
+  if(!confirm('Excluir o empréstimo de '+(e.banco||'')+'? Os pagamentos vinculados também serão apagados.')) return;
   try{ carregando(true,'Excluindo…'); await api('excluirEmprestimo',{id});
     S.emprestimos = S.emprestimos.filter(x=>x.id!==id);
     S.pagamentosBanco = S.pagamentosBanco.filter(g=>String(g.emprestimoId)!==String(id));
@@ -1823,23 +1878,29 @@ async function excluirEmprestimo(id){
   }catch(err){ toast('Erro: '+err.message,'erro'); } finally{ carregando(false); }
 }
 
-function limparFormPagamento(){ ['pgId','pgValor','pgObs'].forEach(i=>$(i).value=''); $('pgData').value=hoje(); }
+/* ---------------------- PAGAMENTOS AO BANCO ------------------------ */
+function limparFormPagamento(){
+  ['pgId','pgBrl','pgUsd','pgChf','pgObs'].forEach(i=>$(i).value='');
+  $('pgData').value = hoje(); atualizarCambio('pg','cambioPg');
+}
 async function salvarPagamentoBanco(){
   const e = S.emprestimos.find(x=>x.id===$('pgEmprestimo').value);
   if(!e){ toast('Selecione o empréstimo.','erro'); return; }
-  const valor = num($('pgValor').value);
-  if(valor<=0){ toast('Informe o valor pago.','erro'); return; }
+  const v = {BRL:num($('pgBrl').value), USD:num($('pgUsd').value), CHF:num($('pgChf').value)};
+  if(v.BRL<=0 || v.USD<=0 || v.CHF<=0){ toast('Preencha o valor pago nas três moedas.','erro'); return; }
   const saldo = saldoDoEmprestimo(e);
-  if(valor > saldo + 0.004 && !confirm('O valor pago é maior que o saldo devedor ('+valorMoeda(saldo, e.moeda)+'). Continuar?')) return;
+  const excede = ORDEM_MOEDAS.filter(m=> v[m] > saldo[m] + 0.004);
+  if(excede.length && !confirm('O valor pago é maior que o saldo devedor em '+excede.join(', ')+'. Continuar?')) return;
   const pagamento = { id:'', emprestimoId:e.id, data:$('pgData').value||hoje(),
-    moeda: MOEDAS[e.moeda]?e.moeda:'BRL', valor, forma:$('pgForma').value, obs:$('pgObs').value.trim() };
+    valorBrl:v.BRL, valorUsd:v.USD, valorChf:v.CHF, moeda:'', valor:v.BRL,
+    forma:$('pgForma').value, obs:$('pgObs').value.trim() };
   try{
     carregando(true,'Lançando pagamento…');
     const salvo = await api('salvarPagamentoBanco',{pagamento});
     S.pagamentosBanco.push(salvo);
     limparFormPagamento(); renderFinanciamento();
-    const novoSaldo = saldoDoEmprestimo(e);
-    toast('Pagamento lançado. Saldo devedor: '+valorMoeda(novoSaldo, e.moeda),'ok');
+    const s = saldoDoEmprestimo(e);
+    toast('Pagamento lançado. Saldo: '+ORDEM_MOEDAS.map(m=>valorMoeda(s[m],m)).join(' • '),'ok');
   }catch(err){ toast('Erro: '+err.message,'erro'); } finally{ carregando(false); }
 }
 async function excluirPagamentoBanco(id){
