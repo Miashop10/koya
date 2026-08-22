@@ -107,6 +107,57 @@ tr.dragover td{background:#fff8f1}
 .moedas{font-size:12.5px;line-height:1.6;white-space:nowrap}
 .moedas .brl{font-weight:800}
 
+.grade-cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.cat-item{background:var(--branco);border:2px solid var(--linha);border-radius:12px;overflow:hidden;
+  cursor:pointer;transition:.15s;position:relative}
+.cat-item:hover{border-color:var(--cinza-claro)}
+.cat-item.on{border-color:var(--laranja);box-shadow:0 0 0 3px rgba(241,134,52,.18)}
+.cat-item .img{height:150px;background:#f6f7f8;display:flex;align-items:center;justify-content:center}
+.cat-item .img img{max-width:100%;max-height:100%;object-fit:contain}
+.cat-item .txt{padding:9px 11px;font-size:12px}
+.cat-item .txt b{display:block;font-size:12.5px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-item .marca{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;
+  background:#fff;border:2px solid var(--linha);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:900;color:#fff}
+.cat-item.on .marca{background:var(--laranja);border-color:var(--laranja)}
+.cat-item .semestoque{color:var(--vermelho);font-weight:800}
+
+/* páginas do catálogo */
+.pagina{width:210mm;min-height:297mm;background:#fff;margin:0 auto 16px;padding:12mm 11mm;
+  position:relative;box-shadow:0 6px 24px rgba(0,0,0,.14);page-break-after:always;
+  display:flex;flex-direction:column;overflow:hidden}
+.pg-topo{display:flex;align-items:center;gap:12px;padding-bottom:8mm}
+.pg-topo img{height:13mm}
+.pg-setor{margin-left:auto;font-size:12pt;font-weight:900;letter-spacing:.5px;color:#fff;
+  padding:3mm 7mm;border-radius:99px;text-transform:uppercase}
+.pg-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1.25fr 1fr 1fr;gap:6mm}
+.pg-grid .destaque{grid-column:1/3}
+.pc{border-radius:6mm;overflow:hidden;display:flex;position:relative}
+.pc .foto{flex:1;display:flex;align-items:center;justify-content:center;padding:4mm;background:#fff}
+.pc .foto img{max-width:100%;max-height:100%;object-fit:contain}
+.pc.destaque{flex-direction:row}
+.pc.destaque .foto{flex:1.4}
+.pc .info{padding:5mm;display:flex;flex-direction:column;justify-content:center;color:#fff}
+.pc:not(.destaque){flex-direction:column}
+.pc:not(.destaque) .info{padding:3.5mm 4mm}
+.pc .nome{font-size:11pt;font-weight:800;line-height:1.25}
+.pc.destaque .nome{font-size:15pt}
+.pc .cod{font-size:8pt;font-weight:700;opacity:.85;letter-spacing:.5px;margin-bottom:2mm}
+.pc .preco{font-size:14pt;font-weight:900;margin-top:2mm}
+.pc.destaque .preco{font-size:20pt}
+.pc .estoque{font-size:8pt;opacity:.9;margin-top:1mm}
+.pg-rodape{display:flex;align-items:center;gap:8px;font-size:8.5pt;color:#666;padding-top:6mm;
+  border-top:1px solid #e6e6e6;margin-top:6mm}
+.capa{align-items:center;justify-content:center;text-align:center;gap:0}
+.capa .faixas{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
+.capa .conteudo{position:relative;z-index:2;background:#fff;border-radius:8mm;padding:16mm 14mm;
+  box-shadow:0 10px 40px rgba(0,0,0,.12);max-width:150mm}
+.capa img{height:22mm;margin-bottom:8mm}
+.capa h1{font-size:30pt;line-height:1.1;margin-bottom:4mm}
+.capa h2{font-size:14pt;font-weight:700;color:#666;margin-bottom:8mm}
+.capa .setores{display:flex;flex-wrap:wrap;gap:3mm;justify-content:center;margin-top:6mm}
+.capa .setores span{font-size:9pt;font-weight:800;color:#fff;padding:2mm 5mm;border-radius:99px}
+
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;
   z-index:90;padding:20px;backdrop-filter:blur(2px)}
@@ -182,13 +233,17 @@ tr.dragover td{background:#fff8f1}
 #login p{color:var(--cinza);font-size:12.5px;margin:0 0 20px}
 
 @media print{
+  @page{size:A4;margin:0}
   body{background:#fff}
   header,nav,main,#toasts,#carregando,.modal-topo,.modal-rodape,.lightbox{display:none !important}
-  .modal{position:static;background:none;padding:0;display:block !important;backdrop-filter:none}
-  .modal:not(#modalRecibo){display:none !important}
+  .modal{position:static;background:none;padding:0;backdrop-filter:none;display:none !important}
+  .modal.aberto{display:block !important}
   .modal-cx{box-shadow:none;max-width:100%;max-height:none;border-radius:0}
-  .modal-corpo{padding:0}
+  .modal-corpo{padding:0 !important;background:#fff !important}
   #reciboArea{padding:0}
+  .pagina{box-shadow:none;margin:0;width:210mm;height:297mm}
+  .pagina:last-child{page-break-after:auto}
+  .pc,.pg-setor,.capa .faixas,.capa .setores span{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
 </head>
@@ -218,6 +273,7 @@ tr.dragover td{background:#fff8f1}
     <button data-aba="transferencias">TRANSFERÊNCIAS</button>
     <button data-aba="financeiro">FINANCEIRO</button>
     <button data-aba="relatorios">RELATÓRIOS DE VENDA</button>
+    <button data-aba="catalogo">CATÁLOGO</button>
     <button data-aba="financiamento">FINANCIAMENTO</button>
     <button data-aba="filiais">FILIAIS</button>
     <button data-aba="config">CONFIGURAÇÕES</button>
@@ -369,6 +425,41 @@ tr.dragover td{background:#fff8f1}
       <tbody id="tbRelPagos"></tbody><tfoot id="tfRelPagos"></tfoot></table>
     </div>
   </div>
+</section>
+
+<!-- ================= CATÁLOGO ================= -->
+<section class="aba" id="aba-catalogo">
+  <div class="card card-pad" style="margin-bottom:18px">
+    <div class="grid g4">
+      <div class="campo"><label>Título do catálogo</label>
+        <input type="text" id="catTitulo" value="Catálogo de Produtos"></div>
+      <div class="campo"><label>Subtítulo</label>
+        <input type="text" id="catSubtitulo" value="Novidades importadas"></div>
+      <div class="campo"><label>Produtos</label>
+        <select id="catFiltro">
+          <option value="estoque">Somente com estoque disponível</option>
+          <option value="todos">Todos os produtos</option>
+        </select></div>
+      <div class="campo"><label>Mostrar na página</label>
+        <select id="catPreco">
+          <option value="preco">Foto, descrição e preço</option>
+          <option value="sempreco">Foto e descrição (sem preço)</option>
+        </select></div>
+    </div>
+    <div class="barra" style="margin:0">
+      <div class="busca"><input type="search" id="catBusca" placeholder="Filtrar por código, descrição ou setor…"></div>
+      <div style="width:230px"><select id="catSetor"><option value="">Todos os setores</option></select></div>
+      <button class="btn" onclick="selecionarCatalogo(true)">Selecionar todos</button>
+      <button class="btn" onclick="selecionarCatalogo(false)">Limpar seleção</button>
+      <div class="espaco"></div>
+      <div style="width:210px"><input type="text" id="catNovoSetor" list="listaSetores2" placeholder="Definir setor…">
+        <datalist id="listaSetores2"></datalist></div>
+      <button class="btn" onclick="aplicarSetor()">Aplicar aos selecionados</button>
+      <button class="btn laranja" onclick="gerarCatalogo()">Gerar catálogo PDF</button>
+    </div>
+    <div id="catResumo" style="margin-top:12px;font-size:12.5px;color:var(--cinza);font-weight:700"></div>
+  </div>
+  <div id="gradeCatalogo" class="grade-cat"></div>
 </section>
 
 <!-- ================= FINANCIAMENTO ================= -->
@@ -529,8 +620,11 @@ tr.dragover td{background:#fff8f1}
         <div class="campo"><label>Custo na China (R$)</label><input type="number" id="prodCusto" step="0.01" value="0"></div>
         <div class="campo"><label>Preço venda Miashop (R$) — dobro do custo</label><input type="number" id="prodPreco" step="0.01" value="0"></div>
       </div>
-      <div class="grid g2">
+      <div class="grid g3">
         <div class="campo"><label>Unidade</label><input type="text" id="prodUnidade" placeholder="UN / CX / PC"></div>
+        <div class="campo"><label>Setor / categoria</label>
+          <input type="text" id="prodSetor" list="listaSetores" placeholder="Ex.: Cama, mesa e banho">
+          <datalist id="listaSetores"></datalist></div>
         <div class="campo"><label>Item SKIWAY / fornecedor</label><input type="text" id="prodSkiway"></div>
       </div>
       <div class="campo"><label>Observações</label><textarea id="prodObs" rows="2"></textarea></div>
@@ -609,6 +703,15 @@ tr.dragover td{background:#fff8f1}
       <button class="btn" onclick="fechar('modalImportXml')">Cancelar</button>
       <button class="btn principal" onclick="confirmarImportacao()">Importar selecionados</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="modalCatalogo">
+  <div class="modal-cx largo" style="max-width:1080px">
+    <div class="modal-topo"><h3>Catálogo gerado</h3><div class="espaco"></div>
+      <button class="btn laranja" onclick="window.print()">Imprimir / Salvar em PDF</button>
+      <button class="fechar" onclick="fechar('modalCatalogo')">×</button></div>
+    <div class="modal-corpo" style="background:#eceef1"><div id="catalogoArea"></div></div>
   </div>
 </div>
 
@@ -751,6 +854,7 @@ function renderTudo(){
   renderProdutos(); renderFiliais(); renderSelects(); renderTransferencias();
   renderFinanceiro(); renderRelatorios(); renderConfig(); renderCarrinho();
   if(window.renderFinanciamento) renderFinanciamento();
+  if(window.renderCatalogo) renderCatalogo();
 }
 
 /* ============================== PRODUTOS =========================== */
@@ -889,7 +993,8 @@ function abrirProduto(id){
   $('prodDescricao').value = p?p.descricao:''; $('prodQtd').value = p?num(p.quantidade):0;
   $('prodCusto').value = p?num(p.custoChina):0; $('prodPreco').value = p?num(p.precoVenda):0;
   $('prodEan').value = p?(p.codigoBarras||''):''; $('prodUnidade').value = p?(p.unidade||'UN'):'UN';
-  $('prodSkiway').value = p?(p.skiwayItem||''):'';
+  $('prodSkiway').value = p?(p.skiwayItem||''):''; $('prodSetor').value = p?(p.setor||''):'';
+  $('listaSetores').innerHTML = setoresExistentes().map(x=>`<option value="${esc(x)}">`).join('');
   $('prodObs').value = p?(p.obs||''):'';
   $('previewProduto').innerHTML = (p&&p.fotoId)
     ? `<img src="${fotoMedia(p.fotoId)}" style="max-height:130px;border-radius:8px;margin-bottom:8px">` : '';
@@ -920,7 +1025,7 @@ async function salvarProduto(){
     custoChina: num($('prodCusto').value), precoVenda: num($('prodPreco').value),
     codigoBarras: $('prodEan').value.trim(), unidade: $('prodUnidade').value.trim(),
     ncm: ($('prodId').value ? ((S.produtos.find(x=>x.id===$('prodId').value)||{}).ncm||'') : ''),
-    skiwayItem: $('prodSkiway').value.trim(),
+    skiwayItem: $('prodSkiway').value.trim(), setor: $('prodSetor').value.trim(),
     obs: $('prodObs').value.trim(),
     fotoId: ($('prodId').value ? (S.produtos.find(x=>x.id===$('prodId').value)||{}).fotoId : '') || ''
   };
@@ -1999,5 +2104,164 @@ async function excluirPagamentoBanco(id){
 
 limparFormEmprestimo(); limparFormPagamento(); renderFinanciamento();
 </script>
+
+<script>
+/* ============================= CATÁLOGO ============================= */
+const CORES_CAT = ['#E6007E','#00A9DC','#C8305A','#8E5A9E','#F18634','#7FA61F','#0F7A8F','#D64545'];
+S.selCatalogo = [];
+
+function setoresExistentes(){
+  return [...new Set(S.produtos.map(p=>String(p.setor||'').trim()).filter(Boolean))].sort();
+}
+function corSetor(nome){
+  let h=0; for(const c of String(nome)) h = (h*31 + c.charCodeAt(0)) % 9973;
+  return CORES_CAT[h % CORES_CAT.length];
+}
+function setorDe(p){ return String(p.setor||'').trim() || 'Diversos'; }
+
+function produtosCatalogo(){
+  const modo = $('catFiltro').value, q = ($('catBusca').value||'').trim().toLowerCase();
+  const setor = $('catSetor').value;
+  return S.produtos.filter(p=>{
+    if(modo==='estoque' && num(p.quantidade)<=0) return false;
+    if(setor && setorDe(p)!==setor) return false;
+    if(q && ![p.codigo,p.descricao,p.setor,p.skiwayItem].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderCatalogo(){
+  const setores = setoresExistentes();
+  const selSetor = $('catSetor').value;
+  $('catSetor').innerHTML = '<option value="">Todos os setores</option>'+
+    setores.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')+
+    (S.produtos.some(p=>!String(p.setor||'').trim())?'<option value="Diversos">Diversos (sem setor)</option>':'');
+  $('catSetor').value = selSetor;
+  $('listaSetores2').innerHTML = setores.map(x=>`<option value="${esc(x)}">`).join('');
+
+  const lista = produtosCatalogo();
+  $('gradeCatalogo').innerHTML = lista.length ? lista.map(p=>{
+    const on = S.selCatalogo.includes(p.id);
+    const semEstoque = num(p.quantidade)<=0;
+    return `<div class="cat-item ${on?'on':''}" onclick="alternarCatalogo('${p.id}')">
+      <div class="marca">${on?'✓':''}</div>
+      <div class="img">${p.fotoId?`<img src="${fotoMedia(p.fotoId)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:11px;font-weight:700">SEM FOTO</span>'}</div>
+      <div class="txt"><b>${esc(p.descricao)}</b>
+        <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> •
+        <span class="${semEstoque?'semestoque':''}">${inteiro(p.quantidade)} un</span><br>
+        <span style="color:${corSetor(setorDe(p))};font-weight:800">${esc(setorDe(p))}</span>
+        ${p.precoVenda?` • ${moeda(p.precoVenda)}`:''}
+      </div></div>`;
+  }).join('') : '<div class="vazio card" style="grid-column:1/-1"><b>Nenhum produto</b>Ajuste os filtros acima.</div>';
+
+  const semFoto = S.selCatalogo.filter(id=>{ const p=S.produtos.find(x=>x.id===id); return p && !p.fotoId; }).length;
+  $('catResumo').innerHTML = `${S.selCatalogo.length} produto(s) selecionado(s) de ${lista.length} listado(s)`+
+    (semFoto?` • <span style="color:var(--vermelho)">${semFoto} sem foto</span>`:'');
+}
+function alternarCatalogo(id){
+  const i = S.selCatalogo.indexOf(id);
+  if(i>=0) S.selCatalogo.splice(i,1); else S.selCatalogo.push(id);
+  renderCatalogo();
+}
+function selecionarCatalogo(tudo){
+  S.selCatalogo = tudo ? produtosCatalogo().map(p=>p.id) : [];
+  renderCatalogo();
+}
+['catFiltro','catSetor'].forEach(id=>$(id).addEventListener('change', renderCatalogo));
+$('catBusca').addEventListener('input', renderCatalogo);
+
+async function aplicarSetor(){
+  const setor = $('catNovoSetor').value.trim();
+  if(!setor){ toast('Digite o nome do setor.','erro'); return; }
+  if(!S.selCatalogo.length){ toast('Selecione os produtos primeiro.','erro'); return; }
+  if(!confirm('Definir o setor "'+setor+'" para '+S.selCatalogo.length+' produto(s)?')) return;
+  try{
+    let n=0;
+    for(const id of S.selCatalogo){
+      const p = S.produtos.find(x=>x.id===id); if(!p) continue;
+      n++; carregando(true,'Salvando setor ('+n+'/'+S.selCatalogo.length+')…');
+      p.setor = setor;
+      await api('salvarProduto',{produto:p});
+    }
+    $('catNovoSetor').value=''; renderCatalogo(); renderProdutos();
+    toast('Setor aplicado a '+n+' produto(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+/* --------------------------- GERAR O PDF --------------------------- */
+function gerarCatalogo(){
+  const sel = S.selCatalogo.length
+    ? S.produtos.filter(p=>S.selCatalogo.includes(p.id))
+    : produtosCatalogo();
+  if(!sel.length){ toast('Selecione ao menos um produto.','erro'); return; }
+
+  const comPreco = $('catPreco').value === 'preco';
+  const titulo = $('catTitulo').value.trim() || 'Catálogo de Produtos';
+  const sub = $('catSubtitulo').value.trim();
+
+  // agrupa por setor
+  const grupos = {};
+  sel.forEach(p=>{ const s = setorDe(p); (grupos[s] = grupos[s] || []).push(p); });
+  const nomes = Object.keys(grupos).sort();
+
+  const paginas = [];
+  // capa
+  paginas.push(`<div class="pagina capa">
+    <div class="faixas">${CORES_CAT.slice(0,6).map(c=>`<div style="background:${c};opacity:.9"></div>`).join('')}</div>
+    <div class="conteudo">
+      <img src="${LOGO}" alt="MIASHOP">
+      <h1>${esc(titulo)}</h1>
+      ${sub?`<h2>${esc(sub)}</h2>`:''}
+      <div style="font-size:10pt;color:#777;font-weight:700">
+        ${sel.length} produtos • ${nomes.length} setor(es) • ${dataBR(hoje())}</div>
+      <div class="setores">${nomes.map(n=>`<span style="background:${corSetor(n)}">${esc(n)}</span>`).join('')}</div>
+    </div>
+  </div>`);
+
+  let np = 1;
+  nomes.forEach(nome=>{
+    const cor = corSetor(nome);
+    const itens = grupos[nome];
+    for(let i=0;i<itens.length;i+=5){
+      np++;
+      const bloco = itens.slice(i,i+5);
+      paginas.push(`<div class="pagina">
+        <div class="pg-topo">
+          <img src="${LOGO}" alt="MIASHOP">
+          <div class="pg-setor" style="background:${cor}">${esc(nome)}</div>
+        </div>
+        <div class="pg-grid">
+          ${bloco.map((p,ix)=>cartaoCatalogo(p, ix===0, cor, comPreco)).join('')}
+        </div>
+        <div class="pg-rodape">
+          <b>MIASHOP</b> • ${esc(titulo)} <span style="margin-left:auto">página ${np}</span>
+        </div>
+      </div>`);
+    }
+  });
+
+  $('catalogoArea').innerHTML = paginas.join('');
+  abrir('modalCatalogo');
+  toast(paginas.length+' página(s) geradas. Use Imprimir → Salvar como PDF.','ok');
+}
+
+function cartaoCatalogo(p, destaque, cor, comPreco){
+  const foto = p.fotoId
+    ? `<img src="${fotoGrande(p.fotoId)}" alt="">`
+    : `<div style="color:#bbb;font-weight:800;font-size:9pt">SEM FOTO</div>`;
+  return `<div class="pc ${destaque?'destaque':''}" style="background:${cor}">
+    <div class="foto">${foto}</div>
+    <div class="info">
+      <div class="cod">COD. ${esc(p.codigo)}${p.codigoBarras?(' • EAN '+esc(p.codigoBarras)):''}</div>
+      <div class="nome">${esc(p.descricao)}</div>
+      ${comPreco && num(p.precoVenda)>0 ? `<div class="preco">${moeda(p.precoVenda)}</div>`:''}
+      <div class="estoque">${num(p.quantidade)>0?(inteiro(p.quantidade)+' un. disponíveis'):'sob encomenda'}</div>
+    </div>
+  </div>`;
+}
+
+renderCatalogo();
+</script>
+
 </body>
 </html>
