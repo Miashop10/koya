@@ -107,6 +107,15 @@ tr.dragover td{background:#fff8f1}
 .moedas{font-size:12.5px;line-height:1.6;white-space:nowrap}
 .moedas .brl{font-weight:800}
 
+.galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
+.galeria .g-item.capa{border-color:var(--laranja)}
+.galeria .g-foto{height:140px;display:flex;align-items:center;justify-content:center;cursor:zoom-in;background:#fff}
+.galeria .g-foto img{max-width:100%;max-height:100%;object-fit:contain}
+.galeria .g-acoes{display:flex;gap:4px;padding:6px;border-top:1px solid var(--linha);flex-wrap:wrap}
+.galeria .selo{background:var(--laranja);color:#fff;font-size:10px;font-weight:900;letter-spacing:.6px;
+  text-align:center;padding:3px}
+
 .grade-cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
 .cat-item{background:var(--branco);border:2px solid var(--linha);border-radius:12px;overflow:hidden;
   cursor:pointer;transition:.15s;position:relative}
@@ -267,6 +276,14 @@ tr.dragover td{background:#fff8f1}
     <div class="espaco"></div>
     <div class="pill"><span class="ponto" id="statusPonto"></span><span id="statusTexto">Conectando…</span></div>
     <button class="btn mini" onclick="sincronizar()">↻ Atualizar</button>
+    <button class="btn mini" id="btnConfig" title="Configurações, filiais e conexão" onclick="abrirConfig()"
+      style="padding:6px 9px" aria-label="Configurações">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09A1.65 1.65 0 0 0 21 10h.09a2 2 0 0 1 0 4H21a1.65 1.65 0 0 0-1.6 1z"></path>
+      </svg>
+    </button>
   </div>
   <nav>
     <button class="ativo" data-aba="estoque">ESTOQUE DO CD</button>
@@ -275,8 +292,6 @@ tr.dragover td{background:#fff8f1}
     <button data-aba="relatorios">RELATÓRIOS DE VENDA</button>
     <button data-aba="catalogo">CATÁLOGO</button>
     <button data-aba="financiamento">FINANCIAMENTO</button>
-    <button data-aba="filiais">FILIAIS</button>
-    <button data-aba="config">CONFIGURAÇÕES</button>
   </nav>
 </header>
 
@@ -295,9 +310,18 @@ tr.dragover td{background:#fff8f1}
   </div>
   <input type="file" id="arqXml" accept=".xml" hidden multiple>
   <input type="file" id="arqExcel" accept=".xlsx,.xls" hidden>
+  <div id="barraMassa" class="barra" style="display:none;background:#fff7ef;border:1px solid var(--laranja);
+       border-radius:10px;padding:10px 12px">
+    <b id="massaResumo"></b>
+    <button class="btn" onclick="abrirEdicaoMassa()">Editar selecionados</button>
+    <button class="btn perigo" onclick="excluirSelecionados()">Excluir selecionados</button>
+    <div class="espaco"></div>
+    <button class="btn mini" onclick="marcarTodos(false)">Limpar seleção</button>
+  </div>
   <div class="tabela-wrap">
     <table>
       <thead><tr>
+        <th style="width:34px"><input type="checkbox" id="chkTodos" onclick="marcarTodos(this.checked)" style="width:auto"></th>
         <th style="width:104px">Foto</th><th>Código</th><th>Descrição</th>
         <th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th>
         <th>Código de barras</th><th class="num" style="width:120px">Ações</th>
@@ -543,28 +567,6 @@ tr.dragover td{background:#fff8f1}
   </div>
 </section>
 
-<!-- ================= FILIAIS ================= -->
-<section class="aba" id="aba-filiais">
-  <div class="duas">
-    <div class="card">
-      <div class="tabela-wrap" style="border:0;box-shadow:none">
-        <table><thead><tr><th>Filial</th><th>CNPJ</th><th class="num" style="width:110px">Ações</th></tr></thead>
-        <tbody id="tbFiliais"></tbody></table>
-      </div>
-    </div>
-    <div class="card card-pad">
-      <h3 style="margin-bottom:14px" id="tituloFilial">Cadastrar filial</h3>
-      <input type="hidden" id="filialId">
-      <div class="campo"><label>Nome da filial</label><input type="text" id="filialNome" placeholder="Ex.: Miashop Filial 01 - Boqueirão"></div>
-      <div class="campo"><label>CNPJ</label><input type="text" id="filialCnpj" placeholder="00.000.000/0000-00"></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn principal" onclick="salvarFilial()">Salvar filial</button>
-        <button class="btn" onclick="limparFormFilial()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ================= CONFIG ================= -->
 <section class="aba" id="aba-config">
   <div class="duas">
@@ -595,6 +597,26 @@ tr.dragover td{background:#fff8f1}
       <h3 style="margin-bottom:10px;font-size:14px">Backup local</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" onclick="exportarBackup()">Baixar backup (JSON)</button>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin:24px 0 12px;font-size:15px">Filiais da Miashop</h3>
+<div class="duas">
+    <div class="card">
+      <div class="tabela-wrap" style="border:0;box-shadow:none">
+        <table><thead><tr><th>Filial</th><th>CNPJ</th><th class="num" style="width:110px">Ações</th></tr></thead>
+        <tbody id="tbFiliais"></tbody></table>
+      </div>
+    </div>
+    <div class="card card-pad">
+      <h3 style="margin-bottom:14px" id="tituloFilial">Cadastrar filial</h3>
+      <input type="hidden" id="filialId">
+      <div class="campo"><label>Nome da filial</label><input type="text" id="filialNome" placeholder="Ex.: Miashop Filial 01 - Boqueirão"></div>
+      <div class="campo"><label>CNPJ</label><input type="text" id="filialCnpj" placeholder="00.000.000/0000-00"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn principal" onclick="salvarFilial()">Salvar filial</button>
+        <button class="btn" onclick="limparFormFilial()">Cancelar</button>
       </div>
     </div>
   </div>
@@ -706,6 +728,55 @@ tr.dragover td{background:#fff8f1}
   </div>
 </div>
 
+<div class="modal" id="modalMassa">
+  <div class="modal-cx">
+    <div class="modal-topo"><h3>Editar produtos selecionados</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalMassa')">×</button></div>
+    <div class="modal-corpo">
+      <p style="color:var(--cinza);font-size:12.5px;margin:0 0 16px">
+        Preencha somente o que quiser alterar — os campos em branco ficam como estão.
+        <b id="massaQtd"></b>
+      </p>
+      <div class="grid g2">
+        <div class="campo"><label>Setor / categoria</label>
+          <input type="text" id="mSetor" list="listaSetores3" placeholder="deixar como está">
+          <datalist id="listaSetores3"></datalist></div>
+        <div class="campo"><label>Unidade</label><input type="text" id="mUnidade" placeholder="deixar como está"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Custo na China (R$)</label><input type="number" id="mCusto" step="0.01" placeholder="deixar como está"></div>
+        <div class="campo"><label>Preço venda Miashop (R$)</label><input type="number" id="mPreco" step="0.01" placeholder="deixar como está"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Ou recalcular preço: custo ×</label><input type="number" id="mMultiplicador" step="0.1" placeholder="ex.: 2"></div>
+        <div class="campo"><label>Fornecedor</label><input type="text" id="mFornecedor" placeholder="deixar como está"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Quantidade em estoque</label><input type="number" id="mQtd" step="1" placeholder="deixar como está"></div>
+        <div class="campo"><label>Observações</label><input type="text" id="mObs" placeholder="deixar como está"></div>
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalMassa')">Cancelar</button>
+      <button class="btn principal" onclick="salvarEdicaoMassa()">Aplicar aos selecionados</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalFotos">
+  <div class="modal-cx">
+    <div class="modal-topo"><h3 id="tituloFotos">Fotos do produto</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalFotos')">×</button></div>
+    <div class="modal-corpo">
+      <div id="dropFotos" style="border:2px dashed var(--linha);border-radius:12px;padding:14px;text-align:center;
+           cursor:pointer;margin-bottom:16px;color:var(--cinza);font-size:12.5px;font-weight:700">
+        Arraste imagens aqui ou clique para adicionar mais fotos
+      </div>
+      <div id="galeriaFotos" class="galeria"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modalCatalogo">
   <div class="modal-cx largo" style="max-width:1080px">
     <div class="modal-topo"><h3>Catálogo gerado</h3><div class="espaco"></div>
@@ -763,7 +834,8 @@ const CONFIG = {
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            carrinho:[], parcelas:[], importar:[], urlPlanilha:'', urlPasta:'', online:false };
+            carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
 const num = v => { const n = parseFloat(String(v??'').toString().replace(/\s/g,'').replace(/\.(?=\d{3}\b)/g,'').replace(',','.')); return isNaN(n)?0:n; };
@@ -816,8 +888,10 @@ function statusConexao(on, txt){
 
 async function sincronizar(silencioso){
   try{
-    carregando(true,'Sincronizando com o Google…');
-    const d = await api('carregarTudo');
+    if(!silencioso) carregando(true,'Sincronizando com o Google…');
+    const d = await api('carregarTudo', {versao: S.versao});
+    if(d.semMudanca){ statusConexao(true); return; }   // nada mudou: não recarrega nada
+    S.versao = d.versao || '';
     S.produtos = d.produtos||[]; S.filiais = d.filiais||[];
     S.transferencias = d.transferencias||[]; S.itens = d.itens||[];
     S.financeiro = d.financeiro||[]; S.config = d.config||{};
@@ -836,7 +910,7 @@ function entrar(){
     toast('Senha incorreta.','erro'); return;
   }
   $('login').style.display='none';
-  sincronizar(true);
+  sincronizar();
 }
 $('senhaLogin').addEventListener('keydown', e=>{ if(e.key==='Enter') entrar(); });
 
@@ -848,6 +922,13 @@ document.querySelectorAll('nav button').forEach(b=>{
     b.classList.add('ativo'); $('aba-'+b.dataset.aba).classList.add('ativa');
   };
 });
+
+function abrirConfig(){
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('ativo'));
+  document.querySelectorAll('.aba').forEach(x=>x.classList.remove('ativa'));
+  $('aba-config').classList.add('ativa');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 
 /* ============================ RENDER GERAL ========================= */
 function renderTudo(){
@@ -870,6 +951,8 @@ function renderProdutos(){
   const tb = $('tbProdutos');
   tb.innerHTML = lista.length ? lista.map(p=>`
     <tr data-id="${p.id}">
+      <td><input type="checkbox" class="selProd" value="${p.id}" ${S.selProdutos.includes(p.id)?'checked':''}
+           onclick="event.stopPropagation();alternarProduto('${p.id}')" style="width:auto"></td>
       <td>${celFoto(p)}</td>
       <td class="mono"><b>${esc(p.codigo)}</b>${p.skiwayItem?`<br><small style="color:var(--cinza)">SKIWAY ${esc(p.skiwayItem)}</small>`:''}</td>
       <td>${esc(p.descricao)}</td>
@@ -883,8 +966,10 @@ function renderProdutos(){
         <button class="btn mini perigo" onclick="excluirProduto('${p.id}')">Excluir</button>
       </td>
     </tr>`).join('')
-    : `<tr><td colspan="9"><div class="vazio"><b>Nenhum produto no estoque</b>
+    : `<tr><td colspan="10"><div class="vazio"><b>Nenhum produto no estoque</b>
        Importe um XML, a planilha do pedido da China ou cadastre manualmente.</div></td></tr>`;
+
+  atualizarBarraMassa();
 
   const qtdTotal = S.produtos.reduce((a,p)=>a+num(p.quantidade),0);
   const custoTot = S.produtos.reduce((a,p)=>a+num(p.quantidade)*num(p.custoChina),0);
@@ -909,10 +994,21 @@ function vendidoDoProduto(p){
   },0);
 }
 
+function fotosDoProduto(p){
+  const lista = String(p.fotosIds||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!lista.length && p.fotoId) return [p.fotoId];
+  if(p.fotoId && !lista.includes(p.fotoId)) lista.unshift(p.fotoId);
+  // a capa sempre em primeiro
+  return p.fotoId ? [p.fotoId, ...lista.filter(x=>x!==p.fotoId)] : lista;
+}
 function celFoto(p){
-  return p.fotoId
-    ? `<div class="foto-cel" onclick="verFoto('${p.fotoId}','${esc(p.codigo)}')"><img src="${fotoMedia(p.fotoId)}" alt="" loading="lazy"></div>`
-    : `<div class="foto-cel" onclick="escolherFoto('${p.id}')"><span>ARRASTE<br>A FOTO</span></div>`;
+  const fotos = fotosDoProduto(p);
+  if(!fotos.length) return `<div class="foto-cel" onclick="abrirFotos('${p.id}')"><span>ARRASTE<br>A FOTO</span></div>`;
+  return `<div class="foto-cel" onclick="abrirFotos('${p.id}')" title="${fotos.length} foto(s)">
+    <img src="${fotoMedia(fotos[0])}" alt="" loading="lazy">
+    ${fotos.length>1?`<span style="position:absolute;right:3px;bottom:3px;background:rgba(20,20,20,.78);color:#fff;
+      border-radius:99px;padding:1px 6px;font-size:10px;font-weight:800">${fotos.length}</span>`:''}
+  </div>`;
 }
 
 /* --- arrastar imagem para a linha do produto --- */
@@ -942,7 +1038,10 @@ async function anexarFoto(produtoId, file){
     carregando(true,'Enviando foto para o Google Drive…');
     const img = await reduzirImagem(file);
     const r = await api('uploadFoto', {produtoId, base64:img.base64, mimeType:img.mime, nome:(file.name||'foto.jpg')});
-    const p = S.produtos.find(x=>x.id===produtoId); if(p) p.fotoId = r.fotoId;
+    const p = S.produtos.find(x=>x.id===produtoId);
+    if(p){ const fotos = fotosDoProduto(p); fotos.push(r.fotoId);
+           p.fotosIds = fotos.join(','); if(!p.fotoId) p.fotoId = r.fotoId; }
+    S.versao='';
     renderProdutos(); toast('Foto anexada.','ok');
   }catch(e){ toast('Erro ao enviar foto: '+e.message,'erro'); }
   finally{ carregando(false); }
@@ -1057,6 +1156,142 @@ async function excluirProduto(id){
 }
 
 $('buscaProduto').addEventListener('input', renderProdutos);
+
+/* ===================== SELEÇÃO E EDIÇÃO EM MASSA =================== */
+function alternarProduto(id){
+  const i = S.selProdutos.indexOf(id);
+  if(i>=0) S.selProdutos.splice(i,1); else S.selProdutos.push(id);
+  atualizarBarraMassa();
+}
+function marcarTodos(marcar){
+  const ids = produtosFiltrados().map(p=>p.id);
+  S.selProdutos = marcar ? ids : [];
+  renderProdutos();
+}
+function atualizarBarraMassa(){
+  const n = S.selProdutos.length;
+  $('barraMassa').style.display = n ? 'flex' : 'none';
+  $('massaResumo').textContent = n+' produto(s) selecionado(s)';
+  const visiveis = produtosFiltrados().map(p=>p.id);
+  $('chkTodos').checked = visiveis.length>0 && visiveis.every(id=>S.selProdutos.includes(id));
+  document.querySelectorAll('.selProd').forEach(c=> c.checked = S.selProdutos.includes(c.value));
+}
+function abrirEdicaoMassa(){
+  if(!S.selProdutos.length){ toast('Selecione ao menos um produto.','erro'); return; }
+  ['mSetor','mUnidade','mCusto','mPreco','mMultiplicador','mFornecedor','mQtd','mObs'].forEach(i=>$(i).value='');
+  $('massaQtd').textContent = S.selProdutos.length+' produto(s) serão alterados.';
+  $('listaSetores3').innerHTML = setoresExistentes().map(x=>`<option value="${esc(x)}">`).join('');
+  abrir('modalMassa');
+}
+async function salvarEdicaoMassa(){
+  const campos = {};
+  const texto = {mSetor:'setor', mUnidade:'unidade', mFornecedor:'fornecedor', mObs:'obs'};
+  Object.keys(texto).forEach(k=>{ const v=$(k).value.trim(); if(v) campos[texto[k]] = v; });
+  const numeros = {mCusto:'custoChina', mPreco:'precoVenda', mQtd:'quantidade'};
+  Object.keys(numeros).forEach(k=>{ const v=$(k).value.trim(); if(v!=='') campos[numeros[k]] = num(v); });
+  const mult = $('mMultiplicador').value.trim() ? num($('mMultiplicador').value) : 0;
+  if(!Object.keys(campos).length && !mult){ toast('Preencha ao menos um campo.','erro'); return; }
+  try{
+    carregando(true,'Aplicando alterações…');
+    const r = await api('atualizarProdutosLote', {ids:S.selProdutos, campos, multiplicador:mult||0});
+    // reflete localmente sem precisar recarregar tudo
+    S.produtos.forEach(p=>{
+      if(!S.selProdutos.includes(p.id)) return;
+      Object.keys(campos).forEach(k=> p[k] = campos[k]);
+      if(mult) p.precoVenda = Math.round(num(p.custoChina)*mult*100)/100;
+    });
+    S.versao = '';
+    fechar('modalMassa'); renderProdutos(); if(window.renderCatalogo) renderCatalogo();
+    toast((r.atualizados||S.selProdutos.length)+' produto(s) atualizado(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+async function excluirSelecionados(){
+  const n = S.selProdutos.length;
+  if(!n) return;
+  if(!confirm('Excluir '+n+' produto(s) do estoque do CD? Essa ação não pode ser desfeita.')) return;
+  try{
+    let i=0;
+    for(const id of [...S.selProdutos]){
+      i++; carregando(true,'Excluindo ('+i+'/'+n+')…');
+      await api('excluirProduto',{id});
+      S.produtos = S.produtos.filter(x=>x.id!==id);
+    }
+    S.selProdutos = []; S.versao=''; renderProdutos(); toast(n+' produto(s) excluído(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+/* ========================= GALERIA DE FOTOS ======================== */
+let produtoFotos = null;
+function abrirFotos(id){
+  produtoFotos = id; renderGaleria(); abrir('modalFotos');
+}
+function renderGaleria(){
+  const p = S.produtos.find(x=>x.id===produtoFotos); if(!p) return;
+  const fotos = fotosDoProduto(p);
+  $('tituloFotos').textContent = 'Fotos • '+p.codigo+' — '+p.descricao;
+  $('galeriaFotos').innerHTML = fotos.length ? fotos.map((f,i)=>`
+    <div class="g-item ${i===0?'capa':''}">
+      ${i===0?'<div class="selo">FOTO DE CAPA</div>':''}
+      <div class="g-foto" onclick="verFoto('${f}','${esc(p.codigo)}')"><img src="${fotoMedia(f)}" alt=""></div>
+      <div class="g-acoes">
+        ${i===0?'':`<button class="btn mini" onclick="definirCapa('${f}')">Tornar capa</button>`}
+        <button class="btn mini" onclick="window.open('${fotoDownload(f)}','_blank')">Baixar</button>
+        <button class="btn mini perigo" onclick="removerFoto('${f}')">Excluir</button>
+      </div>
+    </div>`).join('')
+    : '<div class="vazio">Nenhuma foto. Arraste imagens acima.</div>';
+}
+async function gravarFotos(p){
+  const fotos = fotosDoProduto(p);
+  p.fotoId = fotos[0] || '';
+  p.fotosIds = fotos.join(',');
+  await api('salvarFotos', {id:p.id, fotoId:p.fotoId, fotosIds:p.fotosIds});
+  S.versao='';
+}
+async function definirCapa(fotoId){
+  const p = S.produtos.find(x=>x.id===produtoFotos); if(!p) return;
+  const fotos = fotosDoProduto(p).filter(f=>f!==fotoId);
+  p.fotoId = fotoId; p.fotosIds = [fotoId, ...fotos].join(',');
+  try{ carregando(true,'Definindo capa…'); await gravarFotos(p);
+    renderGaleria(); renderProdutos(); if(window.renderCatalogo) renderCatalogo(); toast('Foto de capa alterada.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+async function removerFoto(fotoId){
+  const p = S.produtos.find(x=>x.id===produtoFotos); if(!p) return;
+  if(!confirm('Remover esta foto do produto?')) return;
+  const fotos = fotosDoProduto(p).filter(f=>f!==fotoId);
+  p.fotoId = fotos[0]||''; p.fotosIds = fotos.join(',');
+  try{ carregando(true,'Removendo foto…'); await gravarFotos(p);
+    renderGaleria(); renderProdutos(); if(window.renderCatalogo) renderCatalogo(); toast('Foto removida.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+$('dropFotos').onclick = ()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  inp.onchange = ()=> adicionarFotos([...inp.files]);
+  inp.click();
+};
+['dragover','dragenter'].forEach(ev=>$('dropFotos').addEventListener(ev,e=>{e.preventDefault();$('dropFotos').style.borderColor='var(--laranja)';}));
+['dragleave','drop'].forEach(ev=>$('dropFotos').addEventListener(ev,()=>$('dropFotos').style.borderColor=''));
+$('dropFotos').addEventListener('drop', e=>{
+  e.preventDefault();
+  adicionarFotos([...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/')));
+});
+async function adicionarFotos(arquivos){
+  if(!arquivos.length || !produtoFotos) return;
+  const p = S.produtos.find(x=>x.id===produtoFotos); if(!p) return;
+  try{
+    let i=0;
+    for(const f of arquivos){
+      i++; carregando(true,'Enviando foto '+i+'/'+arquivos.length+'…');
+      const img = await reduzirImagem(f);
+      const r = await api('uploadFoto',{produtoId:p.id, base64:img.base64, mimeType:img.mime, nome:f.name||'foto.jpg'});
+      const fotos = fotosDoProduto(p); fotos.push(r.fotoId);
+      p.fotosIds = fotos.join(','); if(!p.fotoId) p.fotoId = r.fotoId;
+    }
+    S.versao=''; renderGaleria(); renderProdutos(); if(window.renderCatalogo) renderCatalogo();
+    toast(arquivos.length+' foto(s) adicionada(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
 
 /* ====================== IMPORTAÇÕES (LOTES) ======================= */
 function listaLotes(){
@@ -1880,7 +2115,7 @@ function exportarBackup(){
   if(!CONFIG.API_URL){
     setTimeout(()=>toast('Configure a URL do App Script na aba Configurações.','erro'), 1200);
   }
-  setInterval(()=>{ if(S.online && !document.querySelector('.modal.aberto')) sincronizar(true); }, 120000);
+  setInterval(()=>{ if(S.online && !document.querySelector('.modal.aberto')) sincronizar(true); }, 45000);
 })();
 </script>
 <script>
