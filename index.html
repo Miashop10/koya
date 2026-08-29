@@ -344,7 +344,7 @@ tr.dragover td{background:#fff8f1}
       <thead><tr>
         <th style="width:34px"><input type="checkbox" id="chkTodos" onclick="marcarTodos(this.checked)" style="width:auto"></th>
         <th style="width:104px">Foto</th><th>Código</th><th>Descrição</th>
-        <th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th>
+        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th>
         <th>Código de barras</th><th class="num" style="width:120px">Ações</th>
       </tr></thead>
       <tbody id="tbProdutos"></tbody>
@@ -708,6 +708,9 @@ tr.dragover td{background:#fff8f1}
         <div class="campo"><label>Item SKIWAY / fornecedor</label><input type="text" id="prodSkiway"></div>
       </div>
       <div class="campo"><label>Observações</label><textarea id="prodObs" rows="2"></textarea></div>
+      <div class="campo"><label>Recebimentos do container</label>
+        <div id="resumoRecProduto" style="border:1px solid var(--linha);border-radius:8px;padding:10px 12px;
+             font-size:12.5px;color:var(--cinza);display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div></div>
       <div class="campo"><label>Foto</label>
         <div id="dropProduto" style="border:1px dashed var(--linha);border-radius:10px;padding:16px;text-align:center;cursor:pointer">
           <div id="previewProduto"></div>
@@ -782,6 +785,36 @@ tr.dragover td{background:#fff8f1}
     <div class="modal-rodape">
       <button class="btn" onclick="fechar('modalImportXml')">Cancelar</button>
       <button class="btn principal" onclick="confirmarImportacao()">Importar selecionados</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalRecebimentos">
+  <div class="modal-cx">
+    <div class="modal-topo"><h3 id="tituloReceb">Recebimentos do container</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalRecebimentos')">×</button></div>
+    <div class="modal-corpo">
+      <div class="tabela-wrap" style="max-height:300px;margin-bottom:18px">
+        <table><thead><tr><th>Data</th><th class="num">Quantidade</th><th>Container / lote</th><th>Obs.</th>
+          <th class="num" style="width:60px"></th></tr></thead>
+          <tbody id="tbRecebimentos"></tbody><tfoot id="tfRecebimentos"></tfoot></table>
+      </div>
+      <h3 style="font-size:14px;margin-bottom:12px">Lançar novo recebimento</h3>
+      <div class="grid g2">
+        <div class="campo"><label>Data do recebimento</label><input type="date" id="recData"></div>
+        <div class="campo"><label>Quantidade recebida</label><input type="number" id="recQtd" step="1" placeholder="ex.: 600"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Container / lote</label><input type="text" id="recContainer" placeholder="ex.: MSKU1234567"></div>
+        <div class="campo"><label>Observação</label><input type="text" id="recObs"></div>
+      </div>
+      <label style="text-transform:none;letter-spacing:0;font-size:12.5px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" id="recSomar" checked style="width:auto"> Somar esta quantidade ao estoque do CD
+      </label>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalRecebimentos')">Fechar</button>
+      <button class="btn principal" onclick="salvarRecebimento()">Lançar recebimento</button>
     </div>
   </div>
 </div>
@@ -902,7 +935,7 @@ const CONFIG = {
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            usuarios:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            usuarios:[], recebimentos:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
             urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
@@ -964,7 +997,7 @@ async function sincronizar(silencioso){
     S.transferencias = d.transferencias||[]; S.itens = d.itens||[];
     S.financeiro = d.financeiro||[]; S.config = d.config||{};
     S.emprestimos = d.emprestimos||[]; S.pagamentosBanco = d.pagamentosBanco||[];
-    S.usuarios = d.usuarios||[];
+    S.usuarios = d.usuarios||[]; S.recebimentos = d.recebimentos||[];
     S.urlPlanilha = d.urlPlanilha||''; S.urlPasta = d.urlPasta||'';
     statusConexao(true);
     renderTudo();
@@ -1037,6 +1070,7 @@ function renderProdutos(){
       <td>${celFoto(p)}</td>
       <td class="mono"><b>${esc(p.codigo)}</b>${p.skiwayItem?`<br><small style="color:var(--cinza)">SKIWAY ${esc(p.skiwayItem)}</small>`:''}</td>
       <td>${esc(p.descricao)}</td>
+      <td>${celRecebimento(p)}</td>
       <td class="num"><b style="${num(p.quantidade)<=0?'color:var(--vermelho)':''}">${inteiro(p.quantidade)}</b></td>
       <td class="num">${vendidoDoProduto(p) ? ('<b>'+inteiro(vendidoDoProduto(p))+'</b>') : '<span style="color:var(--cinza-claro)">0</span>'}</td>
       <td class="num">${moeda(p.custoChina)}</td>
@@ -1047,7 +1081,7 @@ function renderProdutos(){
         <button class="btn mini perigo" onclick="excluirProduto('${p.id}')">Excluir</button>
       </td>
     </tr>`).join('')
-    : `<tr><td colspan="10"><div class="vazio"><b>Nenhum produto no estoque</b>
+    : `<tr><td colspan="11"><div class="vazio"><b>Nenhum produto no estoque</b>
        Importe um XML, a planilha do pedido da China ou cadastre manualmente.</div></td></tr>`;
 
   atualizarBarraMassa();
@@ -1176,6 +1210,7 @@ function abrirProduto(id){
   $('prodSkiway').value = p?(p.skiwayItem||''):''; $('prodSetor').value = p?(p.setor||''):'';
   $('listaSetores').innerHTML = setoresExistentes().map(x=>`<option value="${esc(x)}">`).join('');
   $('prodObs').value = p?(p.obs||''):'';
+  atualizarResumoRecProduto();
   $('previewProduto').innerHTML = (p&&p.fotoId)
     ? `<img src="${fotoMedia(p.fotoId)}" style="max-height:130px;border-radius:8px;margin-bottom:8px">` : '';
   abrir('modalProduto');
@@ -1237,6 +1272,97 @@ async function excluirProduto(id){
 }
 
 $('buscaProduto').addEventListener('input', renderProdutos);
+
+/* ================= RECEBIMENTOS DE CONTAINER ====================== */
+function recebimentosDo(p){
+  return S.recebimentos.filter(r=>String(r.produtoId)===String(p.id))
+    .sort((a,b)=> iso(a.data).localeCompare(iso(b.data)));
+}
+function celRecebimento(p){
+  const lista = recebimentosDo(p);
+  if(!lista.length)
+    return `<button class="btn mini" onclick="event.stopPropagation();abrirRecebimentos('${p.id}')">+ lançar</button>`;
+  const ult = lista[lista.length-1];
+  const total = lista.reduce((a,r)=>a+num(r.quantidade),0);
+  return `<div style="cursor:pointer;font-size:12px;line-height:1.45"
+       onclick="event.stopPropagation();abrirRecebimentos('${p.id}')" title="Ver histórico de recebimentos">
+      <b>${dataBR(ult.data)}</b> — ${inteiro(ult.quantidade)} un
+      ${lista.length>1?`<br><span style="color:var(--laranja);font-weight:800">${lista.length} entradas • ${inteiro(total)} un</span>`
+                      :''}
+    </div>`;
+}
+
+let produtoReceb = null;
+function abrirRecebimentos(id){
+  const p = S.produtos.find(x=>x.id===id); if(!p) return;
+  produtoReceb = id;
+  $('tituloReceb').textContent = 'Recebimentos • '+p.codigo+' — '+p.descricao;
+  $('recData').value = hoje(); $('recQtd').value=''; $('recContainer').value=''; $('recObs').value='';
+  $('recSomar').checked = true;
+  renderRecebimentos(); abrir('modalRecebimentos');
+}
+function renderRecebimentos(){
+  const p = S.produtos.find(x=>x.id===produtoReceb); if(!p) return;
+  const lista = recebimentosDo(p);
+  $('tbRecebimentos').innerHTML = lista.length ? lista.map(r=>`
+    <tr>
+      <td><b>${dataBR(r.data)}</b></td>
+      <td class="num"><b>${inteiro(r.quantidade)}</b> un</td>
+      <td class="mono">${esc(r.container||'—')}</td>
+      <td>${esc(r.obs||'')}</td>
+      <td class="num"><button class="btn mini perigo" onclick="excluirRecebimento('${r.id}')">×</button></td>
+    </tr>`).join('')
+    : '<tr><td colspan="5"><div class="vazio">Nenhum recebimento lançado para este produto.</div></td></tr>';
+  const total = lista.reduce((a,r)=>a+num(r.quantidade),0);
+  $('tfRecebimentos').innerHTML = lista.length ? `<tr style="background:#fafbfc">
+      <td style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL RECEBIDO</td>
+      <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${inteiro(total)} un</td>
+      <td colspan="3" style="border-top:2px solid var(--linha);color:var(--cinza);font-size:12px">
+        estoque atual no CD: <b>${inteiro(p.quantidade)}</b> un</td></tr>` : '';
+  atualizarResumoRecProduto();
+}
+function atualizarResumoRecProduto(){
+  const cx = $('resumoRecProduto'); if(!cx) return;
+  const id = $('prodId').value;
+  const p = id ? S.produtos.find(x=>x.id===id) : null;
+  if(!p){ cx.innerHTML = '<span>Salve o produto para lançar os recebimentos do container.</span>'; return; }
+  const lista = recebimentosDo(p);
+  const total = lista.reduce((a,r)=>a+num(r.quantidade),0);
+  cx.innerHTML = (lista.length
+      ? `<span>${lista.length} entrada(s) • <b>${inteiro(total)}</b> un recebidas • última em <b>${dataBR(lista[lista.length-1].data)}</b></span>`
+      : '<span>Nenhum recebimento lançado.</span>')
+    + `<button class="btn mini" onclick="abrirRecebimentos('${p.id}')">Ver histórico / lançar</button>`;
+}
+async function salvarRecebimento(){
+  const p = S.produtos.find(x=>x.id===produtoReceb); if(!p) return;
+  const qtd = num($('recQtd').value);
+  if(qtd<=0){ toast('Informe a quantidade recebida.','erro'); return; }
+  const somar = $('recSomar').checked;
+  const recebimento = { id:'', produtoId:p.id, codigo:p.codigo, data:$('recData').value||hoje(),
+    quantidade:qtd, container:$('recContainer').value.trim(), obs:$('recObs').value.trim() };
+  try{
+    carregando(true,'Lançando recebimento…');
+    const r = await api('salvarRecebimento',{recebimento, somarEstoque:somar});
+    S.recebimentos.push(r.recebimento);
+    if(somar && r.quantidade !== null && r.quantidade !== undefined) p.quantidade = r.quantidade;
+    S.versao='';
+    $('recQtd').value=''; $('recContainer').value=''; $('recObs').value='';
+    renderRecebimentos(); renderProdutos();
+    toast('Recebimento lançado.'+(somar?' Estoque atualizado para '+inteiro(p.quantidade)+' un.':''),'ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+async function excluirRecebimento(id){
+  const r = S.recebimentos.find(x=>x.id===id); if(!r) return;
+  const abater = confirm('Excluir o recebimento de '+inteiro(r.quantidade)+' un em '+dataBR(r.data)+'?\n\nOK = descontar a quantidade do estoque.\nCancelar = manter o estoque como está.');
+  try{
+    carregando(true,'Excluindo…');
+    const res = await api('excluirRecebimento',{id, abaterEstoque:abater});
+    S.recebimentos = S.recebimentos.filter(x=>x.id!==id);
+    const p = S.produtos.find(x=>x.id===r.produtoId);
+    if(p && abater && res.quantidade !== null && res.quantidade !== undefined) p.quantidade = res.quantidade;
+    S.versao=''; renderRecebimentos(); renderProdutos(); toast('Recebimento excluído.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
 
 /* ===================== SELEÇÃO E EDIÇÃO EM MASSA =================== */
 function alternarProduto(id){
@@ -1564,8 +1690,11 @@ function exportarXmlTransferencia(id){
 }
 function csv(linhas){ return '\uFEFF'+linhas.map(l=>l.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n'); }
 function exportarCsvProdutos(){
-  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','CUSTO CHINA','PRECO VENDA MIASHOP','CODIGO DE BARRAS','UNIDADE','NCM']];
-  produtosFiltrados().forEach(p=>l.push([p.codigo,p.descricao,num(p.quantidade),vendidoDoProduto(p),num(p.custoChina).toFixed(2),
+  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','PRECO VENDA MIASHOP','CODIGO DE BARRAS','UNIDADE','NCM']];
+  produtosFiltrados().forEach(p=>l.push([p.codigo,p.descricao,num(p.quantidade),vendidoDoProduto(p),
+    recebimentosDo(p).reduce((a,r)=>a+num(r.quantidade),0),
+    recebimentosDo(p).length?dataBR(recebimentosDo(p)[recebimentosDo(p).length-1].data):'',
+    num(p.custoChina).toFixed(2),
     num(p.precoVenda).toFixed(2),p.codigoBarras||'',p.unidade||'UN',p.ncm||'']));
   baixarArquivo('miashop-produtos-'+hoje()+'.csv', csv(l), 'text/csv;charset=utf-8');
 }
@@ -2270,6 +2399,8 @@ function itemRelatorioPdf(p){
       <div class="cd">${esc(p.codigo)}${p.skiwayItem?(' • SKIWAY '+esc(p.skiwayItem)):''}</div>
       <div style="margin:.8mm 0"><span class="setor" style="background:${cor}">${esc(setor)}</span></div>
       <table>
+        ${(()=>{ const l=recebimentosDo(p); return l.length
+            ? `<tr><td>Recebido</td><td>${dataBR(l[l.length-1].data)}</td></tr>` : ''; })()}
         <tr><td>Estoque</td><td>${inteiro(p.quantidade)} un</td></tr>
         <tr><td>Vendido</td><td>${inteiro(vendidoDoProduto(p))} un</td></tr>
         <tr><td>Custo China</td><td>${moeda(p.custoChina)}</td></tr>
