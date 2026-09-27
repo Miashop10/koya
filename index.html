@@ -125,6 +125,18 @@ tr.dragover td{background:#fff8f1}
 .rel-item .d td{border:0;padding:.3mm 0}
 .rel-item .d td:last-child{text-align:right;font-weight:800}
 
+.lote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;
+  max-height:60vh;overflow:auto;padding:2px}
+.lote-card{border:2px solid var(--linha);border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;position:relative}
+.lote-card:hover{border-color:var(--cinza-claro)}
+.lote-card.on{border-color:var(--laranja);box-shadow:0 0 0 3px rgba(241,134,52,.18)}
+.lote-card .im{height:110px;display:flex;align-items:center;justify-content:center;background:#f7f8f9}
+.lote-card .im img{max-width:100%;max-height:100%;object-fit:contain}
+.lote-card .tx{padding:7px 9px;font-size:11.5px;line-height:1.35}
+.lote-card .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lote-card .badge{position:absolute;top:6px;right:6px;background:var(--verde);color:#fff;border-radius:99px;
+  padding:1px 7px;font-size:10px;font-weight:900}
+
 .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
 .galeria .g-item.capa{border-color:var(--laranja)}
@@ -359,7 +371,11 @@ tr.dragover td{background:#fff8f1}
 <section class="aba" id="aba-transferencias">
   <div class="duas">
     <div class="card card-pad">
-      <h3 style="margin-bottom:14px">Nova transferência para filial</h3>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <h3>Nova transferência para filial</h3>
+        <div class="espaco"></div>
+        <button class="btn laranja" onclick="abrirLote()">⇉ Transferências em lote</button>
+      </div>
       <div class="campo">
         <label>Filial de destino</label>
         <select id="selFilial"><option value="">Selecione a filial…</option></select>
@@ -789,6 +805,71 @@ tr.dragover td{background:#fff8f1}
   </div>
 </div>
 
+<div class="modal" id="modalLote">
+  <div class="modal-cx" style="max-width:1240px">
+    <div class="modal-topo"><h3>Transferências em lote — um produto para várias filiais</h3><div class="espaco"></div>
+      <button class="btn" onclick="limparLote()">Limpar tudo</button>
+      <button class="fechar" onclick="fechar('modalLote')">×</button></div>
+    <div class="modal-corpo">
+      <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:start">
+        <div>
+          <div class="barra" style="margin-bottom:12px">
+            <div class="busca" style="max-width:none;flex:1">
+              <input type="search" id="loteBusca" placeholder="Buscar produto com estoque…"></div>
+          </div>
+          <div id="loteProdutos" class="lote-grid"></div>
+        </div>
+        <div class="card" style="position:sticky;top:0">
+          <div class="card-pad" id="loteCabecalho"></div>
+          <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:44vh">
+            <table><thead><tr><th>Filial</th><th class="num" style="width:120px">Quantidade</th>
+              <th class="num">Valor</th></tr></thead>
+              <tbody id="loteFiliais"></tbody></table>
+          </div>
+        </div>
+      </div>
+      <div class="card card-pad" style="margin-top:18px">
+        <h3 style="font-size:14px;margin-bottom:10px">Resumo do lote</h3>
+        <div id="loteResumo"></div>
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalLote')">Fechar</button>
+      <button class="btn laranja" onclick="irPagamentoLote()">Continuar para pagamento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalLotePagamento">
+  <div class="modal-cx largo" style="max-width:1100px">
+    <div class="modal-topo"><h3>Pagamento de cada filial</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalLotePagamento')">×</button></div>
+    <div class="modal-corpo">
+      <div class="card card-pad" style="margin-bottom:16px;background:#fff7ef;border-color:var(--laranja)">
+        <div class="grid g4">
+          <div class="campo"><label>Forma de pagamento</label>
+            <select id="lpForma"><option>Boleto</option><option>PIX</option><option>Transferência bancária</option>
+              <option>Cartão de crédito</option><option>Dinheiro</option><option>Débito em conta</option></select></div>
+          <div class="campo"><label>Parcelas</label><input type="number" id="lpParcelas" value="1" min="1" max="48"></div>
+          <div class="campo"><label>1º vencimento</label><input type="date" id="lpPrimeiro"></div>
+          <div class="campo"><label>Intervalo (dias)</label><input type="number" id="lpIntervalo" value="30" min="1"></div>
+        </div>
+        <button class="btn" onclick="aplicarPagamentoTodas()">Aplicar a todas as filiais</button>
+      </div>
+      <div class="tabela-wrap" style="max-height:52vh">
+        <table><thead><tr><th>Filial</th><th class="num">Itens</th><th class="num">Valor</th>
+          <th>Forma</th><th class="num" style="width:90px">Parc.</th><th style="width:160px">1º vencimento</th>
+          <th class="num" style="width:90px">Interv.</th><th>Vencimentos</th></tr></thead>
+          <tbody id="tbLotePagamento"></tbody><tfoot id="tfLotePagamento"></tfoot></table>
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalLotePagamento');abrir('modalLote')">Voltar</button>
+      <button class="btn laranja" onclick="confirmarLote()">Gerar transferências</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modalRecebimentos">
   <div class="modal-cx">
     <div class="modal-topo"><h3 id="tituloReceb">Recebimentos do container</h3><div class="espaco"></div>
@@ -855,6 +936,26 @@ tr.dragover td{background:#fff8f1}
         <div class="campo"><label>Quantidade em estoque</label><input type="number" id="mQtd" step="1" placeholder="deixar como está"></div>
         <div class="campo"><label>Observações</label><input type="text" id="mObs" placeholder="deixar como está"></div>
       </div>
+
+      <hr style="border:0;border-top:1px solid var(--linha);margin:20px 0">
+      <h3 style="font-size:14px;margin-bottom:6px">Recebimento do container</h3>
+      <p style="color:var(--cinza);font-size:12.5px;margin:0 0 14px">
+        Preencha a data para registrar a chegada do container em todos os produtos selecionados.
+        Deixe em branco se não quiser lançar recebimento agora.
+      </p>
+      <div class="grid g2">
+        <div class="campo"><label>Data do recebimento</label><input type="date" id="mRecData"></div>
+        <div class="campo"><label>Container / lote</label><input type="text" id="mRecContainer" placeholder="ex.: MSKU1234567"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Quantidade por produto</label>
+          <input type="number" id="mRecQtd" step="1" placeholder="vazio = usar o estoque atual de cada um"></div>
+        <div class="campo"><label>Observação do recebimento</label><input type="text" id="mRecObs"></div>
+      </div>
+      <label style="text-transform:none;letter-spacing:0;font-size:12.5px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" id="mRecSomar" style="width:auto"> Somar as quantidades ao estoque do CD
+        <span style="color:var(--cinza)">(deixe desmarcado se o estoque já contempla este container)</span>
+      </label>
     </div>
     <div class="modal-rodape">
       <button class="btn" onclick="fechar('modalMassa')">Cancelar</button>
@@ -1385,7 +1486,9 @@ function atualizarBarraMassa(){
 }
 function abrirEdicaoMassa(){
   if(!S.selProdutos.length){ toast('Selecione ao menos um produto.','erro'); return; }
-  ['mSetor','mUnidade','mCusto','mPreco','mMultiplicador','mFornecedor','mQtd','mObs'].forEach(i=>$(i).value='');
+  ['mSetor','mUnidade','mCusto','mPreco','mMultiplicador','mFornecedor','mQtd','mObs',
+   'mRecData','mRecContainer','mRecQtd','mRecObs'].forEach(i=>$(i).value='');
+  $('mRecSomar').checked = false;
   $('massaQtd').textContent = S.selProdutos.length+' produto(s) serão alterados.';
   $('listaSetores3').innerHTML = setoresExistentes().map(x=>`<option value="${esc(x)}">`).join('');
   abrir('modalMassa');
@@ -1397,19 +1500,37 @@ async function salvarEdicaoMassa(){
   const numeros = {mCusto:'custoChina', mPreco:'precoVenda', mQtd:'quantidade'};
   Object.keys(numeros).forEach(k=>{ const v=$(k).value.trim(); if(v!=='') campos[numeros[k]] = num(v); });
   const mult = $('mMultiplicador').value.trim() ? num($('mMultiplicador').value) : 0;
-  if(!Object.keys(campos).length && !mult){ toast('Preencha ao menos um campo.','erro'); return; }
+  const recData = $('mRecData').value;
+  if(!Object.keys(campos).length && !mult && !recData){ toast('Preencha ao menos um campo.','erro'); return; }
+  const ids = [...S.selProdutos];
   try{
-    carregando(true,'Aplicando alterações…');
-    const r = await api('atualizarProdutosLote', {ids:S.selProdutos, campos, multiplicador:mult||0});
-    // reflete localmente sem precisar recarregar tudo
-    S.produtos.forEach(p=>{
-      if(!S.selProdutos.includes(p.id)) return;
-      Object.keys(campos).forEach(k=> p[k] = campos[k]);
-      if(mult) p.precoVenda = Math.round(num(p.custoChina)*mult*100)/100;
-    });
+    let msg = [];
+    if(Object.keys(campos).length || mult){
+      carregando(true,'Aplicando alterações…');
+      const r = await api('atualizarProdutosLote', {ids, campos, multiplicador:mult||0});
+      S.produtos.forEach(p=>{
+        if(!ids.includes(p.id)) return;
+        Object.keys(campos).forEach(k=> p[k] = campos[k]);
+        if(mult) p.precoVenda = Math.round(num(p.custoChina)*mult*100)/100;
+      });
+      msg.push((r.atualizados||ids.length)+' produto(s) atualizado(s)');
+    }
+    if(recData){
+      carregando(true,'Lançando recebimento do container…');
+      const somar = $('mRecSomar').checked;
+      const rec = await api('lancarRecebimentosLote', {ids, data:recData,
+        container:$('mRecContainer').value.trim(), obs:$('mRecObs').value.trim(),
+        quantidade: num($('mRecQtd').value)||0, somarEstoque: somar});
+      (rec.recebimentos||[]).forEach(x=>{
+        S.recebimentos.push(x);
+        if(somar){ const p = S.produtos.find(y=>y.id===x.produtoId);
+                   if(p) p.quantidade = num(p.quantidade)+num(x.quantidade); }
+      });
+      msg.push((rec.lancados||0)+' recebimento(s) lançado(s) em '+dataBR(recData));
+    }
     S.versao = '';
     fechar('modalMassa'); renderProdutos(); if(window.renderCatalogo) renderCatalogo();
-    toast((r.atualizados||S.selProdutos.length)+' produto(s) atualizado(s).','ok');
+    toast(msg.join(' • '),'ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 async function excluirSelecionados(){
@@ -2008,6 +2129,208 @@ async function excluirTransferencia(id){
   try{ carregando(true,'Cancelando…'); await api('excluirTransferencia',{id, devolverEstoque:true});
     await sincronizar(true); toast('Transferência cancelada.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+/* =================== TRANSFERÊNCIAS EM LOTE ======================= */
+/* Um produto -> várias filiais, gerando uma transferência (e um financeiro)
+   separada para cada filial.                                            */
+S.lote = { produtoId:'', qtds:{}, pag:{} };
+
+function abrirLote(){
+  if(!S.filiais.length){ toast('Cadastre as filiais antes (engrenagem → Filiais).','erro'); return; }
+  renderLoteProdutos(); renderLotePainel(); abrir('modalLote');
+}
+function limparLote(){ S.lote = {produtoId:'', qtds:{}, pag:{}}; renderLoteProdutos(); renderLotePainel(); }
+
+function loteProdutosDisponiveis(){
+  const q = ($('loteBusca').value||'').trim().toLowerCase();
+  return S.produtos.filter(p=> num(p.quantidade)>0 &&
+    (!q || [p.codigo,p.descricao,p.codigoBarras,p.setor].some(v=>String(v||'').toLowerCase().includes(q))));
+}
+function renderLoteProdutos(){
+  const lista = loteProdutosDisponiveis();
+  $('loteProdutos').innerHTML = lista.length ? lista.map(p=>{
+    const foto = fotosDoProduto(p)[0];
+    return `<div class="lote-card ${S.lote.produtoId===p.id?'on':''}" onclick="selecionarLote('${p.id}')">
+      <span class="badge">${inteiro(p.quantidade)}</span>
+      <div class="im">${foto?`<img src="${fotoMedia(foto)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:10px;font-weight:800">SEM FOTO</span>'}</div>
+      <div class="tx"><b>${esc(p.descricao)}</b>
+        <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> • ${moeda(p.precoVenda)}</div>
+    </div>`;
+  }).join('')
+  : '<div class="vazio" style="grid-column:1/-1"><b>Nenhum produto com estoque</b>Só aparecem aqui itens com saldo no CD.</div>';
+}
+function selecionarLote(id){
+  if(S.lote.produtoId !== id){ S.lote.produtoId = id; S.lote.qtds = {}; }
+  renderLoteProdutos(); renderLotePainel();
+}
+
+function loteProduto(){ return S.produtos.find(p=>p.id===S.lote.produtoId); }
+function loteUsado(){ return Object.values(S.lote.qtds).reduce((a,v)=>a+num(v),0); }
+function loteSaldo(){ const p = loteProduto(); return p ? num(p.quantidade)-loteUsado() : 0; }
+
+function renderLotePainel(){
+  const p = loteProduto();
+  if(!p){
+    $('loteCabecalho').innerHTML = '<div class="vazio" style="padding:20px"><b>Selecione um produto</b>As filiais aparecem aqui para distribuir a quantidade.</div>';
+    $('loteFiliais').innerHTML = ''; $('loteResumo').innerHTML =
+      '<div style="color:var(--cinza);font-size:12.5px">Nenhum produto selecionado.</div>';
+    return;
+  }
+  const foto = fotosDoProduto(p)[0];
+  const saldo = loteSaldo();
+  $('loteCabecalho').innerHTML = `
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="foto-cel" style="width:62px;height:62px;cursor:default">
+        ${foto?`<img src="${fotoMedia(foto)}">`:''}</div>
+      <div style="flex:1;min-width:0">
+        <b style="display:block">${esc(p.descricao)}</b>
+        <small class="mono" style="color:var(--cinza)">${esc(p.codigo)} • ${moeda(p.precoVenda)} / un</small>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <div style="flex:1;background:${saldo<0?'var(--vermelho-bg)':'#f6f7f8'};border-radius:9px;padding:9px 12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">SALDO NO CD</div>
+        <div style="font-size:21px;font-weight:800;color:${saldo<0?'var(--vermelho)':'var(--tinta)'}">${inteiro(saldo)} un</div>
+      </div>
+      <div style="flex:1;background:#fff7ef;border-radius:9px;padding:9px 12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
+        <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteUsado())} un</div>
+      </div>
+    </div>`;
+
+  $('loteFiliais').innerHTML = S.filiais.map(f=>{
+    const q = num(S.lote.qtds[f.id]||0);
+    return `<tr>
+      <td><b>${esc(f.nome)}</b>${f.cnpj?`<br><small class="mono" style="color:var(--cinza)">${esc(f.cnpj)}</small>`:''}</td>
+      <td class="num"><input type="number" min="0" step="1" value="${q||''}" placeholder="0"
+        style="width:100px;text-align:right" onchange="mudarQtdLote('${f.id}', this.value)"></td>
+      <td class="num">${q?('<b>'+moeda(q*num(p.precoVenda))+'</b>'):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
+  const totalQ = loteUsado(), totalV = totalQ*num(p.precoVenda);
+  $('loteResumo').innerHTML = linhas.length
+    ? `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">TRANSFERÊNCIAS A GERAR</span>
+          <div style="font-size:20px;font-weight:800">${linhas.length}</div></div>
+        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">PEÇAS</span>
+          <div style="font-size:20px;font-weight:800">${inteiro(totalQ)}</div></div>
+        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">VALOR TOTAL</span>
+          <div style="font-size:20px;font-weight:800">${moeda(totalV)}</div></div>
+        <div style="flex:1;min-width:220px;color:var(--cinza);font-size:12.5px">
+          ${linhas.map(f=>esc(f.nome)+': '+inteiro(S.lote.qtds[f.id])+' un').join(' • ')}</div>
+      </div>`
+    : '<div style="color:var(--cinza);font-size:12.5px">Informe a quantidade de cada filial ao lado.</div>';
+}
+function mudarQtdLote(filialId, valor){
+  const p = loteProduto(); if(!p) return;
+  let q = Math.max(0, Math.round(num(valor)));
+  const outras = Object.keys(S.lote.qtds).filter(k=>k!==filialId)
+    .reduce((a,k)=>a+num(S.lote.qtds[k]),0);
+  if(q + outras > num(p.quantidade)){
+    q = Math.max(0, num(p.quantidade)-outras);
+    toast('Estoque disponível: '+inteiro(num(p.quantidade)-outras)+' un.','erro');
+  }
+  if(q) S.lote.qtds[filialId] = q; else delete S.lote.qtds[filialId];
+  renderLotePainel();
+}
+$('loteBusca').addEventListener('input', renderLoteProdutos);
+
+/* --------- pagamento por filial --------- */
+function irPagamentoLote(){
+  const p = loteProduto();
+  if(!p){ toast('Selecione o produto.','erro'); return; }
+  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
+  if(!linhas.length){ toast('Informe a quantidade de ao menos uma filial.','erro'); return; }
+  linhas.forEach(f=>{
+    if(!S.lote.pag[f.id]) S.lote.pag[f.id] = {forma:'Boleto', parcelas:1, primeiro:somarDias(hoje(),30), intervalo:30};
+  });
+  $('lpPrimeiro').value = somarDias(hoje(),30);
+  fechar('modalLote'); renderLotePagamento(); abrir('modalLotePagamento');
+}
+function aplicarPagamentoTodas(){
+  const base = {forma:$('lpForma').value, parcelas:Math.max(1,Math.round(num($('lpParcelas').value))||1),
+    primeiro:$('lpPrimeiro').value||somarDias(hoje(),30), intervalo:Math.max(1,Math.round(num($('lpIntervalo').value))||30)};
+  Object.keys(S.lote.pag).forEach(id=> S.lote.pag[id] = {...base});
+  renderLotePagamento(); toast('Condição aplicada a todas as filiais.','ok');
+}
+function mudarPagLote(filialId, campo, valor){
+  const c = S.lote.pag[filialId]; if(!c) return;
+  c[campo] = (campo==='forma'||campo==='primeiro') ? valor : Math.max(1, Math.round(num(valor))||1);
+  renderLotePagamento();
+}
+function parcelasLote(valor, cond){
+  const n = Math.max(1, Math.round(num(cond.parcelas))||1);
+  const base = Math.floor((valor/n)*100)/100;
+  const out = [];
+  for(let i=0;i<n;i++){
+    out.push({ parcela:i+1, totalParcelas:n,
+      valor: i===n-1 ? Math.round((valor-base*(n-1))*100)/100 : base,
+      vencimento: i===0 ? cond.primeiro : somarDias(cond.primeiro, cond.intervalo*i), status:'ABERTO' });
+  }
+  return out;
+}
+function renderLotePagamento(){
+  const p = loteProduto(); if(!p) return;
+  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
+  $('tbLotePagamento').innerHTML = linhas.map(f=>{
+    const q = num(S.lote.qtds[f.id]), v = q*num(p.precoVenda), c = S.lote.pag[f.id];
+    const parc = parcelasLote(v, c);
+    return `<tr>
+      <td><b>${esc(f.nome)}</b></td>
+      <td class="num">${inteiro(q)}</td>
+      <td class="num"><b>${moeda(v)}</b></td>
+      <td><select onchange="mudarPagLote('${f.id}','forma',this.value)" style="width:150px">
+        ${['Boleto','PIX','Transferência bancária','Cartão de crédito','Dinheiro','Débito em conta']
+          .map(o=>`<option ${c.forma===o?'selected':''}>${o}</option>`).join('')}</select></td>
+      <td class="num"><input type="number" min="1" max="48" value="${c.parcelas}" style="width:70px;text-align:right"
+        onchange="mudarPagLote('${f.id}','parcelas',this.value)"></td>
+      <td><input type="date" value="${c.primeiro}" style="width:150px"
+        onchange="mudarPagLote('${f.id}','primeiro',this.value)"></td>
+      <td class="num"><input type="number" min="1" value="${c.intervalo}" style="width:70px;text-align:right"
+        onchange="mudarPagLote('${f.id}','intervalo',this.value)"></td>
+      <td style="font-size:11.5px;line-height:1.5;color:var(--cinza)">
+        ${parc.map(x=>`${x.parcela}/${x.totalParcelas} ${dataBR(x.vencimento)} — <b>${moeda(x.valor)}</b>`).join('<br>')}</td>
+    </tr>`;
+  }).join('');
+  const totQ = loteUsado(), totV = totQ*num(p.precoVenda);
+  $('tfLotePagamento').innerHTML = `<tr style="background:#fafbfc">
+    <td style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(totQ)}</td>
+    <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${moeda(totV)}</td>
+    <td colspan="5" style="border-top:2px solid var(--linha);color:var(--cinza);font-size:12px">
+      ${linhas.length} transferência(s) serão emitidas, cada uma com recibo e financeiro próprios</td></tr>`;
+}
+
+async function confirmarLote(){
+  const p = loteProduto(); if(!p) return;
+  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
+  if(!linhas.length){ toast('Nenhuma filial com quantidade.','erro'); return; }
+  if(!confirm('Gerar '+linhas.length+' transferência(s) do produto '+p.codigo+'?')) return;
+  const emitidas = [];
+  try{
+    let i=0;
+    for(const f of linhas){
+      i++; carregando(true,'Emitindo transferência '+i+'/'+linhas.length+' — '+f.nome+'…');
+      const q = num(S.lote.qtds[f.id]), preco = num(p.precoVenda), total = q*preco;
+      const transferencia = { data: hoje(), filialId:f.id, filialNome:f.nome, filialCnpj:f.cnpj||'',
+        qtdItens:q, valorTotal:total, formaPagamento:S.lote.pag[f.id].forma,
+        qtdParcelas:S.lote.pag[f.id].parcelas, obs:'Transferência em lote' };
+      const itens = [{ produtoId:p.id, codigo:p.codigo, descricao:p.descricao, quantidade:q,
+        precoUnit:preco, total, codigoBarras:p.codigoBarras||'', fotoId:fotosDoProduto(p)[0]||'' }];
+      const r = await api('criarTransferencia', {transferencia, itens, parcelas: parcelasLote(total, S.lote.pag[f.id])});
+      emitidas.push(r.transferencia.numero);
+    }
+    S.versao=''; limparLote();
+    fechar('modalLotePagamento');
+    await sincronizar(true);
+    toast(emitidas.length+' transferência(s) emitida(s): nº '+emitidas.join(', '),'ok');
+  }catch(e){
+    S.versao=''; await sincronizar(true);
+    toast('Erro após emitir '+emitidas.length+': '+e.message,'erro');
+  } finally{ carregando(false); }
 }
 
 /* ------------------------------ RECIBO ---------------------------- */
