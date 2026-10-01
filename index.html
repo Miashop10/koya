@@ -356,10 +356,13 @@ tr.dragover td{background:#fff8f1}
       <thead><tr>
         <th style="width:34px"><input type="checkbox" id="chkTodos" onclick="marcarTodos(this.checked)" style="width:auto"></th>
         <th style="width:104px">Foto</th><th>Código</th><th>Descrição</th>
-        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th><th class="num">Preço venda loja</th>
+        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Valor total custo</th>
+        <th class="num">Preço venda Miashop</th><th class="num">Valor total venda Miashop</th>
+        <th class="num">Preço venda loja</th><th class="num">Valor total venda loja</th>
         <th>Código de barras</th><th class="num" style="width:120px">Ações</th>
       </tr></thead>
       <tbody id="tbProdutos"></tbody>
+      <tfoot id="tfProdutos"></tfoot>
     </table>
   </div>
   <p style="color:var(--cinza);font-size:12px;margin-top:10px">
@@ -1183,22 +1186,46 @@ function renderProdutos(){
       <td class="num"><b style="${num(p.quantidade)<=0?'color:var(--vermelho)':''}">${inteiro(p.quantidade)}</b></td>
       <td class="num">${vendidoDoProduto(p) ? ('<b>'+inteiro(vendidoDoProduto(p))+'</b>') : '<span style="color:var(--cinza-claro)">0</span>'}</td>
       <td class="num">${moeda(p.custoChina)}</td>
+      <td class="num" style="background:#fafbfc">${moeda(num(p.quantidade)*num(p.custoChina))}</td>
       <td class="num"><b>${moeda(p.precoVenda)}</b></td>
+      <td class="num" style="background:#fafbfc"><b>${moeda(num(p.quantidade)*num(p.precoVenda))}</b></td>
       <td class="num">${num(p.precoLoja)>0?('<b>'+moeda(p.precoLoja)+'</b>'):'<span style="color:var(--cinza-claro)">—</span>'}</td>
+      <td class="num" style="background:#fafbfc">${num(p.precoLoja)>0?('<b>'+moeda(num(p.quantidade)*num(p.precoLoja))+'</b>'):'<span style="color:var(--cinza-claro)">—</span>'}</td>
       <td class="mono">${p.codigoBarras ? esc(p.codigoBarras) : '<span style="color:var(--cinza-claro)">sem EAN</span>'}</td>
       <td class="num">
         <button class="btn mini" onclick="abrirProduto('${p.id}')">Editar</button>
         <button class="btn mini perigo" onclick="excluirProduto('${p.id}')">Excluir</button>
       </td>
     </tr>`).join('')
-    : `<tr><td colspan="12"><div class="vazio"><b>Nenhum produto no estoque</b>
+    : `<tr><td colspan="15"><div class="vazio"><b>Nenhum produto no estoque</b>
        Importe um XML, a planilha do pedido da China ou cadastre manualmente.</div></td></tr>`;
 
   atualizarBarraMassa();
 
+  // totais da lista exibida (acompanham o filtro de busca)
+  const tQtd   = lista.reduce((a,p)=>a+num(p.quantidade),0);
+  const tVend  = lista.reduce((a,p)=>a+vendidoDoProduto(p),0);
+  const tCusto = lista.reduce((a,p)=>a+num(p.quantidade)*num(p.custoChina),0);
+  const tMia   = lista.reduce((a,p)=>a+num(p.quantidade)*num(p.precoVenda),0);
+  const tLoja  = lista.reduce((a,p)=>a+num(p.quantidade)*num(p.precoLoja),0);
+  $('tfProdutos').innerHTML = lista.length ? `<tr style="background:#f3f4f6">
+      <td colspan="5" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">
+        TOTAL ${($('buscaProduto').value||'').trim()?'(filtro aplicado)':''} — ${inteiro(lista.length)} produto(s)</td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(tQtd)}</td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(tVend)}</td>
+      <td style="border-top:2px solid var(--linha)"></td>
+      <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(tCusto)}</td>
+      <td style="border-top:2px solid var(--linha)"></td>
+      <td class="num" style="font-weight:800;font-size:14px;border-top:2px solid var(--linha)">${moeda(tMia)}</td>
+      <td style="border-top:2px solid var(--linha)"></td>
+      <td class="num" style="font-weight:800;font-size:14px;border-top:2px solid var(--linha)">${moeda(tLoja)}</td>
+      <td colspan="2" style="border-top:2px solid var(--linha)"></td>
+    </tr>` : '';
+
   const qtdTotal = S.produtos.reduce((a,p)=>a+num(p.quantidade),0);
   const custoTot = S.produtos.reduce((a,p)=>a+num(p.quantidade)*num(p.custoChina),0);
   const vendaTot = S.produtos.reduce((a,p)=>a+num(p.quantidade)*num(p.precoVenda),0);
+  const lojaTot  = S.produtos.reduce((a,p)=>a+num(p.quantidade)*num(p.precoLoja),0);
   const vendidasTot = S.itens.reduce((a,i)=>a+num(i.quantidade),0);
   $('kpisEstoque').innerHTML = `
     ${kpi('Produtos cadastrados', inteiro(S.produtos.length),'')}
@@ -1206,6 +1233,7 @@ function renderProdutos(){
     ${kpi('Peças já vendidas', inteiro(vendidasTot),'verde')}
     ${kpi('Custo total (China)', moeda(custoTot),'')}
     ${kpi('Valor de venda p/ filiais', moeda(vendaTot),'verde')}
+    ${kpi('Valor de venda nas lojas', moeda(lojaTot),'laranja')}
     ${kpi('Margem prevista', moeda(vendaTot-custoTot),'verde')}`;
 }
 function kpi(rot,val,cls){ return `<div class="kpi ${cls||''}"><div class="rot">${rot}</div><div class="val">${val}</div></div>`; }
@@ -1824,12 +1852,14 @@ function exportarXmlTransferencia(id){
 }
 function csv(linhas){ return '\uFEFF'+linhas.map(l=>l.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n'); }
 function exportarCsvProdutos(){
-  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','PRECO VENDA MIASHOP','PRECO VENDA LOJA','CODIGO DE BARRAS','UNIDADE','NCM']];
+  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','VALOR TOTAL CUSTO','PRECO VENDA MIASHOP','VALOR TOTAL VENDA MIASHOP','PRECO VENDA LOJA','VALOR TOTAL VENDA LOJA','CODIGO DE BARRAS','UNIDADE','NCM']];
   produtosFiltrados().forEach(p=>l.push([p.codigo,p.descricao,num(p.quantidade),vendidoDoProduto(p),
     recebimentosDo(p).reduce((a,r)=>a+num(r.quantidade),0),
     recebimentosDo(p).length?dataBR(recebimentosDo(p)[recebimentosDo(p).length-1].data):'',
-    num(p.custoChina).toFixed(2),
-    num(p.precoVenda).toFixed(2),num(p.precoLoja).toFixed(2),p.codigoBarras||'',p.unidade||'UN',p.ncm||'']));
+    num(p.custoChina).toFixed(2),(num(p.quantidade)*num(p.custoChina)).toFixed(2),
+    num(p.precoVenda).toFixed(2),(num(p.quantidade)*num(p.precoVenda)).toFixed(2),
+    num(p.precoLoja).toFixed(2),(num(p.quantidade)*num(p.precoLoja)).toFixed(2),
+    p.codigoBarras||'',p.unidade||'UN',p.ncm||'']));
   baixarArquivo('miashop-produtos-'+hoje()+'.csv', csv(l), 'text/csv;charset=utf-8');
 }
 
@@ -2740,8 +2770,11 @@ function itemRelatorioPdf(p){
         <tr><td>Estoque</td><td>${inteiro(p.quantidade)} un</td></tr>
         <tr><td>Vendido</td><td>${inteiro(vendidoDoProduto(p))} un</td></tr>
         <tr><td>Custo China</td><td>${moeda(p.custoChina)}</td></tr>
+        <tr><td>Total custo</td><td>${moeda(num(p.quantidade)*num(p.custoChina))}</td></tr>
         <tr><td>Venda Miashop</td><td>${moeda(p.precoVenda)}</td></tr>
-        ${num(p.precoLoja)>0?`<tr><td>Venda loja</td><td>${moeda(p.precoLoja)}</td></tr>`:''}
+        <tr><td>Total venda Miashop</td><td>${moeda(num(p.quantidade)*num(p.precoVenda))}</td></tr>
+        ${num(p.precoLoja)>0?`<tr><td>Venda loja</td><td>${moeda(p.precoLoja)}</td></tr>
+        <tr><td>Total venda loja</td><td>${moeda(num(p.quantidade)*num(p.precoLoja))}</td></tr>`:''}
         ${p.codigoBarras?`<tr><td>EAN</td><td>${esc(p.codigoBarras)}</td></tr>`:''}
       </table>
     </div>
