@@ -356,7 +356,7 @@ tr.dragover td{background:#fff8f1}
       <thead><tr>
         <th style="width:34px"><input type="checkbox" id="chkTodos" onclick="marcarTodos(this.checked)" style="width:auto"></th>
         <th style="width:104px">Foto</th><th>Código</th><th>Descrição</th>
-        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th>
+        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Preço venda Miashop</th><th class="num">Preço venda loja</th>
         <th>Código de barras</th><th class="num" style="width:120px">Ações</th>
       </tr></thead>
       <tbody id="tbProdutos"></tbody>
@@ -503,8 +503,9 @@ tr.dragover td{background:#fff8f1}
         </select></div>
       <div class="campo"><label>Mostrar na página</label>
         <select id="catPreco">
-          <option value="preco">Foto, descrição e preço</option>
-          <option value="sempreco">Foto e descrição (sem preço)</option>
+          <option value="preco">Preço de venda Miashop (filiais)</option>
+          <option value="loja">Preço de venda na loja (consumidor)</option>
+          <option value="sempreco">Sem preço</option>
         </select></div>
     </div>
     <div class="barra" style="margin:0">
@@ -711,10 +712,13 @@ tr.dragover td{background:#fff8f1}
           <button class="btn mini" onclick="document.getElementById('prodEan').value=novoEan()">Gerar</button></div></div>
       </div>
       <div class="campo"><label>Descrição</label><input type="text" id="prodDescricao"></div>
-      <div class="grid g3">
+      <div class="grid g2">
         <div class="campo"><label>Quantidade</label><input type="number" id="prodQtd" step="1" value="0"></div>
         <div class="campo"><label>Custo na China (R$)</label><input type="number" id="prodCusto" step="0.01" value="0"></div>
+      </div>
+      <div class="grid g2">
         <div class="campo"><label>Preço venda Miashop (R$) — dobro do custo</label><input type="number" id="prodPreco" step="0.01" value="0"></div>
+        <div class="campo"><label>Preço venda loja (R$) — ao consumidor</label><input type="number" id="prodPrecoLoja" step="0.01" value="0"></div>
       </div>
       <div class="grid g3">
         <div class="campo"><label>Unidade</label><input type="text" id="prodUnidade" placeholder="UN / CX / PC"></div>
@@ -927,6 +931,10 @@ tr.dragover td{background:#fff8f1}
       <div class="grid g2">
         <div class="campo"><label>Custo na China (R$)</label><input type="number" id="mCusto" step="0.01" placeholder="deixar como está"></div>
         <div class="campo"><label>Preço venda Miashop (R$)</label><input type="number" id="mPreco" step="0.01" placeholder="deixar como está"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>Preço venda loja (R$)</label><input type="number" id="mPrecoLoja" step="0.01" placeholder="deixar como está"></div>
+        <div class="campo"><label>Ou preço de loja: venda Miashop ×</label><input type="number" id="mMultLoja" step="0.1" placeholder="ex.: 2"></div>
       </div>
       <div class="grid g2">
         <div class="campo"><label>Ou recalcular preço: custo ×</label><input type="number" id="mMultiplicador" step="0.1" placeholder="ex.: 2"></div>
@@ -1176,13 +1184,14 @@ function renderProdutos(){
       <td class="num">${vendidoDoProduto(p) ? ('<b>'+inteiro(vendidoDoProduto(p))+'</b>') : '<span style="color:var(--cinza-claro)">0</span>'}</td>
       <td class="num">${moeda(p.custoChina)}</td>
       <td class="num"><b>${moeda(p.precoVenda)}</b></td>
+      <td class="num">${num(p.precoLoja)>0?('<b>'+moeda(p.precoLoja)+'</b>'):'<span style="color:var(--cinza-claro)">—</span>'}</td>
       <td class="mono">${p.codigoBarras ? esc(p.codigoBarras) : '<span style="color:var(--cinza-claro)">sem EAN</span>'}</td>
       <td class="num">
         <button class="btn mini" onclick="abrirProduto('${p.id}')">Editar</button>
         <button class="btn mini perigo" onclick="excluirProduto('${p.id}')">Excluir</button>
       </td>
     </tr>`).join('')
-    : `<tr><td colspan="11"><div class="vazio"><b>Nenhum produto no estoque</b>
+    : `<tr><td colspan="12"><div class="vazio"><b>Nenhum produto no estoque</b>
        Importe um XML, a planilha do pedido da China ou cadastre manualmente.</div></td></tr>`;
 
   atualizarBarraMassa();
@@ -1307,6 +1316,7 @@ function abrirProduto(id){
   $('prodId').value = p?p.id:''; $('prodCodigo').value = p?p.codigo:'';
   $('prodDescricao').value = p?p.descricao:''; $('prodQtd').value = p?num(p.quantidade):0;
   $('prodCusto').value = p?num(p.custoChina):0; $('prodPreco').value = p?num(p.precoVenda):0;
+  $('prodPrecoLoja').value = p?num(p.precoLoja):0;
   $('prodEan').value = p?(p.codigoBarras||''):''; $('prodUnidade').value = p?(p.unidade||'UN'):'UN';
   $('prodSkiway').value = p?(p.skiwayItem||''):''; $('prodSetor').value = p?(p.setor||''):'';
   $('listaSetores').innerHTML = setoresExistentes().map(x=>`<option value="${esc(x)}">`).join('');
@@ -1339,6 +1349,7 @@ async function salvarProduto(){
     id: $('prodId').value || '', codigo: $('prodCodigo').value.trim(),
     descricao: $('prodDescricao').value.trim(), quantidade: num($('prodQtd').value),
     custoChina: num($('prodCusto').value), precoVenda: num($('prodPreco').value),
+    precoLoja: num($('prodPrecoLoja').value),
     codigoBarras: $('prodEan').value.trim(), unidade: $('prodUnidade').value.trim(),
     ncm: ($('prodId').value ? ((S.produtos.find(x=>x.id===$('prodId').value)||{}).ncm||'') : ''),
     skiwayItem: $('prodSkiway').value.trim(), setor: $('prodSetor').value.trim(),
@@ -1486,7 +1497,7 @@ function atualizarBarraMassa(){
 }
 function abrirEdicaoMassa(){
   if(!S.selProdutos.length){ toast('Selecione ao menos um produto.','erro'); return; }
-  ['mSetor','mUnidade','mCusto','mPreco','mMultiplicador','mFornecedor','mQtd','mObs',
+  ['mSetor','mUnidade','mCusto','mPreco','mPrecoLoja','mMultLoja','mMultiplicador','mFornecedor','mQtd','mObs',
    'mRecData','mRecContainer','mRecQtd','mRecObs'].forEach(i=>$(i).value='');
   $('mRecSomar').checked = false;
   $('massaQtd').textContent = S.selProdutos.length+' produto(s) serão alterados.';
@@ -1497,21 +1508,23 @@ async function salvarEdicaoMassa(){
   const campos = {};
   const texto = {mSetor:'setor', mUnidade:'unidade', mFornecedor:'fornecedor', mObs:'obs'};
   Object.keys(texto).forEach(k=>{ const v=$(k).value.trim(); if(v) campos[texto[k]] = v; });
-  const numeros = {mCusto:'custoChina', mPreco:'precoVenda', mQtd:'quantidade'};
+  const numeros = {mCusto:'custoChina', mPreco:'precoVenda', mPrecoLoja:'precoLoja', mQtd:'quantidade'};
   Object.keys(numeros).forEach(k=>{ const v=$(k).value.trim(); if(v!=='') campos[numeros[k]] = num(v); });
   const mult = $('mMultiplicador').value.trim() ? num($('mMultiplicador').value) : 0;
+  const multLoja = $('mMultLoja').value.trim() ? num($('mMultLoja').value) : 0;
   const recData = $('mRecData').value;
-  if(!Object.keys(campos).length && !mult && !recData){ toast('Preencha ao menos um campo.','erro'); return; }
+  if(!Object.keys(campos).length && !mult && !multLoja && !recData){ toast('Preencha ao menos um campo.','erro'); return; }
   const ids = [...S.selProdutos];
   try{
     let msg = [];
-    if(Object.keys(campos).length || mult){
+    if(Object.keys(campos).length || mult || multLoja){
       carregando(true,'Aplicando alterações…');
-      const r = await api('atualizarProdutosLote', {ids, campos, multiplicador:mult||0});
+      const r = await api('atualizarProdutosLote', {ids, campos, multiplicador:mult||0, multiplicadorLoja:multLoja||0});
       S.produtos.forEach(p=>{
         if(!ids.includes(p.id)) return;
         Object.keys(campos).forEach(k=> p[k] = campos[k]);
         if(mult) p.precoVenda = Math.round(num(p.custoChina)*mult*100)/100;
+        if(multLoja) p.precoLoja = Math.round(num(p.precoVenda)*multLoja*100)/100;
       });
       msg.push((r.atualizados||ids.length)+' produto(s) atualizado(s)');
     }
@@ -1811,12 +1824,12 @@ function exportarXmlTransferencia(id){
 }
 function csv(linhas){ return '\uFEFF'+linhas.map(l=>l.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n'); }
 function exportarCsvProdutos(){
-  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','PRECO VENDA MIASHOP','CODIGO DE BARRAS','UNIDADE','NCM']];
+  const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','PRECO VENDA MIASHOP','PRECO VENDA LOJA','CODIGO DE BARRAS','UNIDADE','NCM']];
   produtosFiltrados().forEach(p=>l.push([p.codigo,p.descricao,num(p.quantidade),vendidoDoProduto(p),
     recebimentosDo(p).reduce((a,r)=>a+num(r.quantidade),0),
     recebimentosDo(p).length?dataBR(recebimentosDo(p)[recebimentosDo(p).length-1].data):'',
     num(p.custoChina).toFixed(2),
-    num(p.precoVenda).toFixed(2),p.codigoBarras||'',p.unidade||'UN',p.ncm||'']));
+    num(p.precoVenda).toFixed(2),num(p.precoLoja).toFixed(2),p.codigoBarras||'',p.unidade||'UN',p.ncm||'']));
   baixarArquivo('miashop-produtos-'+hoje()+'.csv', csv(l), 'text/csv;charset=utf-8');
 }
 
@@ -2728,6 +2741,7 @@ function itemRelatorioPdf(p){
         <tr><td>Vendido</td><td>${inteiro(vendidoDoProduto(p))} un</td></tr>
         <tr><td>Custo China</td><td>${moeda(p.custoChina)}</td></tr>
         <tr><td>Venda Miashop</td><td>${moeda(p.precoVenda)}</td></tr>
+        ${num(p.precoLoja)>0?`<tr><td>Venda loja</td><td>${moeda(p.precoLoja)}</td></tr>`:''}
         ${p.codigoBarras?`<tr><td>EAN</td><td>${esc(p.codigoBarras)}</td></tr>`:''}
       </table>
     </div>
@@ -3021,7 +3035,7 @@ function renderCatalogo(){
         <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> •
         <span class="${semEstoque?'semestoque':''}">${inteiro(p.quantidade)} un</span><br>
         <span style="color:${corSetor(setorDe(p))};font-weight:800">${esc(setorDe(p))}</span>
-        ${p.precoVenda?` • ${moeda(p.precoVenda)}`:''}
+        ${p.precoVenda?` • ${moeda(p.precoVenda)}`:''}${num(p.precoLoja)>0?` • loja ${moeda(p.precoLoja)}`:''}
       </div></div>`;
   }).join('') : '<div class="vazio card" style="grid-column:1/-1"><b>Nenhum produto</b>Ajuste os filtros acima.</div>';
 
@@ -3066,7 +3080,7 @@ function gerarCatalogo(){
     : produtosCatalogo();
   if(!sel.length){ toast('Selecione ao menos um produto.','erro'); return; }
 
-  const comPreco = $('catPreco').value === 'preco';
+  const modoPreco = $('catPreco').value;
   const titulo = $('catTitulo').value.trim() || 'Catálogo de Produtos';
   const sub = $('catSubtitulo').value.trim();
 
@@ -3102,7 +3116,7 @@ function gerarCatalogo(){
           <div class="pg-setor" style="background:${cor}">${esc(nome)}</div>
         </div>
         <div class="pg-grid">
-          ${bloco.map((p,ix)=>cartaoCatalogo(p, ix===0, cor, comPreco)).join('')}
+          ${bloco.map((p,ix)=>cartaoCatalogo(p, ix===0, cor, modoPreco)).join('')}
         </div>
         <div class="pg-rodape">
           <b>MIASHOP</b> • ${esc(titulo)} <span style="margin-left:auto">página ${np}</span>
@@ -3116,7 +3130,8 @@ function gerarCatalogo(){
   toast(paginas.length+' página(s) geradas. Use Imprimir → Salvar como PDF.','ok');
 }
 
-function cartaoCatalogo(p, destaque, cor, comPreco){
+function cartaoCatalogo(p, destaque, cor, modoPreco){
+  const valor = modoPreco==='loja' ? num(p.precoLoja) : (modoPreco==='preco' ? num(p.precoVenda) : 0);
   const foto = p.fotoId
     ? `<img src="${fotoGrande(p.fotoId)}" alt="">`
     : `<div style="color:#bbb;font-weight:800;font-size:9pt">SEM FOTO</div>`;
@@ -3125,7 +3140,7 @@ function cartaoCatalogo(p, destaque, cor, comPreco){
     <div class="info">
       <div class="cod">COD. ${esc(p.codigo)}${p.codigoBarras?(' • EAN '+esc(p.codigoBarras)):''}</div>
       <div class="nome">${esc(p.descricao)}</div>
-      ${comPreco && num(p.precoVenda)>0 ? `<div class="preco">${moeda(p.precoVenda)}</div>`:''}
+      ${valor>0 ? `<div class="preco">${moeda(valor)}</div>`:''}
       <div class="estoque">${num(p.quantidade)>0?(inteiro(p.quantidade)+' un. disponíveis'):'sob encomenda'}</div>
     </div>
   </div>`;
