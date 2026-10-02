@@ -136,6 +136,18 @@ tr.dragover td{background:#fff8f1}
 .lote-card .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lote-card .badge{position:absolute;top:6px;right:6px;background:var(--verde);color:#fff;border-radius:99px;
   padding:1px 7px;font-size:10px;font-weight:900}
+.fil-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:6px;
+  padding:0 14px 14px;max-height:56vh;overflow:auto}
+.fil-item{display:flex;align-items:center;gap:8px;border:1px solid var(--linha);border-radius:8px;
+  padding:5px 8px;background:#fff}
+.fil-item.preenchida{border-color:var(--laranja);background:#fff8f2}
+.fil-item .nm{flex:1;min-width:0;font-size:12px;font-weight:700;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fil-item .nm small{display:block;font-weight:600;color:var(--cinza);font-size:10.5px}
+.fil-item input{width:68px;text-align:right;padding:5px 7px;border-radius:6px;font-weight:700}
+.fil-item .vl{width:74px;text-align:right;font-size:11px;font-weight:800;color:var(--cinza)}
+.fil-item.preenchida .vl{color:var(--tinta)}
+
 .lote-card.usado{border-color:var(--laranja)}
 .lote-card .badge-dist{position:absolute;top:6px;left:6px;background:var(--laranja);color:#fff;border-radius:99px;
   padding:1px 7px;font-size:10px;font-weight:900}
@@ -821,7 +833,7 @@ tr.dragover td{background:#fff8f1}
       <button class="btn" onclick="limparLote()">Limpar tudo</button>
       <button class="fechar" onclick="fechar('modalLote')">×</button></div>
     <div class="modal-corpo">
-      <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:start">
+      <div style="display:grid;grid-template-columns:.78fr 1.22fr;gap:18px;align-items:start">
         <div>
           <div class="barra" style="margin-bottom:12px">
             <div class="busca" style="max-width:none;flex:1">
@@ -831,11 +843,7 @@ tr.dragover td{background:#fff8f1}
         </div>
         <div class="card" style="position:sticky;top:0">
           <div class="card-pad" id="loteCabecalho"></div>
-          <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:44vh">
-            <table><thead><tr><th>Filial</th><th class="num" style="width:120px">Quantidade</th>
-              <th class="num">Valor</th></tr></thead>
-              <tbody id="loteFiliais"></tbody></table>
-          </div>
+          <div id="loteFiliais" class="fil-grid"></div>
         </div>
       </div>
       <div class="card card-pad" style="margin-top:18px">
@@ -2245,57 +2253,67 @@ function selecionarLote(id){
 }
 
 /* ---- painel de distribuição ---- */
-function renderLotePainel(){
+function renderLoteCabecalho(){
   const p = loteProduto();
   if(!p){
     $('loteCabecalho').innerHTML = '<div class="vazio" style="padding:20px"><b>Selecione um produto</b>As filiais aparecem aqui para distribuir a quantidade. A distribuição já feita fica guardada.</div>';
-    $('loteFiliais').innerHTML = '';
-  } else {
-    const foto = fotosDoProduto(p)[0];
-    const saldo = loteSaldoProduto(p);
-    $('loteCabecalho').innerHTML = `
-      <div style="display:flex;gap:12px;align-items:center">
-        <div class="foto-cel" style="width:62px;height:62px;cursor:default">
-          ${foto?`<img src="${fotoMedia(foto)}">`:''}</div>
-        <div style="flex:1;min-width:0">
-          <b style="display:block">${esc(p.descricao)}</b>
-          <small class="mono" style="color:var(--cinza)">${esc(p.codigo)} • ${moeda(p.precoVenda)} / un</small>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:12px">
-        <div style="flex:1;background:${saldo<0?'var(--vermelho-bg)':'#f6f7f8'};border-radius:9px;padding:9px 12px">
-          <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">SALDO NO CD</div>
-          <div style="font-size:21px;font-weight:800;color:${saldo<0?'var(--vermelho)':'var(--tinta)'}">${inteiro(saldo)} un</div>
-        </div>
-        <div style="flex:1;background:#fff7ef;border-radius:9px;padding:9px 12px">
-          <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
-          <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteDistribuido(p.id))} un</div>
-        </div>
-      </div>`;
-    $('loteFiliais').innerHTML = S.filiais.map(f=>{
-      const q = loteQtd(p.id, f.id);
-      return `<tr>
-        <td><b>${esc(f.nome)}</b>${f.cnpj?`<br><small class="mono" style="color:var(--cinza)">${esc(f.cnpj)}</small>`:''}</td>
-        <td class="num"><input type="number" min="0" step="1" value="${q||''}" placeholder="0"
-          style="width:100px;text-align:right" onchange="mudarQtdLote('${f.id}', this.value)"></td>
-        <td class="num">${q?('<b>'+moeda(q*num(p.precoVenda))+'</b>'):'—'}</td>
-      </tr>`;
-    }).join('');
+    return;
   }
+  const foto = fotosDoProduto(p)[0], saldo = loteSaldoProduto(p);
+  $('loteCabecalho').innerHTML = `
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="foto-cel" style="width:62px;height:62px;cursor:default">
+        ${foto?`<img src="${fotoMedia(foto)}">`:''}</div>
+      <div style="flex:1;min-width:0">
+        <b style="display:block">${esc(p.descricao)}</b>
+        <small class="mono" style="color:var(--cinza)">${esc(p.codigo)} • ${moeda(p.precoVenda)} / un</small>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <div style="flex:1;background:${saldo<0?'var(--vermelho-bg)':'#f6f7f8'};border-radius:9px;padding:9px 12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">SALDO NO CD</div>
+        <div style="font-size:21px;font-weight:800;color:${saldo<0?'var(--vermelho)':'var(--tinta)'}">${inteiro(saldo)} un</div>
+      </div>
+      <div style="flex:1;background:#fff7ef;border-radius:9px;padding:9px 12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
+        <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteDistribuido(p.id))} un</div>
+      </div>
+    </div>`;
+}
+
+function renderLotePainel(){
+  const p = loteProduto();
+  renderLoteCabecalho();
+  // a lista de filiais só é recriada ao trocar de produto — assim o Tab
+  // segue para o campo da próxima filial sem perder o foco
+  $('loteFiliais').innerHTML = p ? S.filiais.map(f=>{
+    const q = loteQtd(p.id, f.id);
+    return `<label class="fil-item ${q?'preenchida':''}" id="fil-${f.id}">
+      <span class="nm">${esc(f.nome)}${f.cnpj?`<small>${esc(f.cnpj)}</small>`:''}</span>
+      <input type="number" min="0" step="1" value="${q||''}" placeholder="0"
+        onfocus="this.select()" oninput="mudarQtdLote('${f.id}', this)">
+      <span class="vl" id="vl-${f.id}">${q?moeda(q*num(p.precoVenda)):'—'}</span>
+    </label>`;
+  }).join('') : '';
   renderLoteResumo();
 }
-function mudarQtdLote(filialId, valor){
+
+function mudarQtdLote(filialId, el){
   const p = loteProduto(); if(!p) return;
-  let q = Math.max(0, Math.round(num(valor)));
+  let q = Math.max(0, Math.round(num(el.value)));
   const outras = loteDistribuido(p.id) - loteQtd(p.id, filialId);
-  if(q + outras > num(p.quantidade)){
-    q = Math.max(0, num(p.quantidade)-outras);
-    toast('Estoque disponível: '+inteiro(num(p.quantidade)-outras)+' un.','erro');
-  }
+  const livre = num(p.quantidade) - outras;
+  if(q > livre){ q = Math.max(0, livre); el.value = q || ''; toast('Estoque disponível: '+inteiro(livre)+' un.','erro'); }
+
   S.lote.dist[p.id] = S.lote.dist[p.id] || {};
   if(q) S.lote.dist[p.id][filialId] = q; else delete S.lote.dist[p.id][filialId];
   if(!Object.keys(S.lote.dist[p.id]).length) delete S.lote.dist[p.id];
-  renderLotePainel(); renderLoteProdutos();
+
+  // atualiza só o que mudou, sem recriar os campos (mantém o foco e o Tab)
+  const cx = $('fil-'+filialId), vl = $('vl-'+filialId);
+  if(cx) cx.classList.toggle('preenchida', q>0);
+  if(vl) vl.textContent = q ? moeda(q*num(p.precoVenda)) : '—';
+  renderLoteCabecalho(); renderLoteResumo(); renderLoteProdutos();
 }
 $('loteBusca').addEventListener('input', renderLoteProdutos);
 
