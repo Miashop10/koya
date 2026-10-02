@@ -136,6 +136,9 @@ tr.dragover td{background:#fff8f1}
 .lote-card .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lote-card .badge{position:absolute;top:6px;right:6px;background:var(--verde);color:#fff;border-radius:99px;
   padding:1px 7px;font-size:10px;font-weight:900}
+.lote-card.usado{border-color:var(--laranja)}
+.lote-card .badge-dist{position:absolute;top:6px;left:6px;background:var(--laranja);color:#fff;border-radius:99px;
+  padding:1px 7px;font-size:10px;font-weight:900}
 
 .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
@@ -814,7 +817,7 @@ tr.dragover td{background:#fff8f1}
 
 <div class="modal" id="modalLote">
   <div class="modal-cx" style="max-width:1240px">
-    <div class="modal-topo"><h3>Transferências em lote — um produto para várias filiais</h3><div class="espaco"></div>
+    <div class="modal-topo"><h3>Transferências em lote — vários produtos para várias filiais</h3><div class="espaco"></div>
       <button class="btn" onclick="limparLote()">Limpar tudo</button>
       <button class="fechar" onclick="fechar('modalLote')">×</button></div>
     <div class="modal-corpo">
@@ -836,7 +839,7 @@ tr.dragover td{background:#fff8f1}
         </div>
       </div>
       <div class="card card-pad" style="margin-top:18px">
-        <h3 style="font-size:14px;margin-bottom:10px">Resumo do lote</h3>
+        <h3 style="font-size:14px;margin-bottom:10px">Resumo do lote — tudo que será emitido</h3>
         <div id="loteResumo"></div>
       </div>
     </div>
@@ -1231,10 +1234,10 @@ function renderProdutos(){
     ${kpi('Produtos cadastrados', inteiro(S.produtos.length),'')}
     ${kpi('Peças em estoque', inteiro(qtdTotal),'laranja')}
     ${kpi('Peças já vendidas', inteiro(vendidasTot),'verde')}
-    ${kpi('Custo total (China)', moeda(custoTot),'')}
-    ${kpi('Valor de venda p/ filiais', moeda(vendaTot),'verde')}
-    ${kpi('Valor de venda nas lojas', moeda(lojaTot),'laranja')}
-    ${kpi('Margem prevista', moeda(vendaTot-custoTot),'verde')}`;
+    ${kpi('Valor total custo (China)', moeda(custoTot),'')}
+    ${kpi('Valor total venda Miashop', moeda(vendaTot),'verde')}
+    ${kpi('Valor total venda loja', moeda(lojaTot),'laranja')}
+    ${kpi('Margem prevista (CD → filiais)', moeda(vendaTot-custoTot),'verde')}`;
 }
 function kpi(rot,val,cls){ return `<div class="kpi ${cls||''}"><div class="rot">${rot}</div><div class="val">${val}</div></div>`; }
 
@@ -2174,17 +2177,48 @@ async function excluirTransferencia(id){
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 
-/* =================== TRANSFERÊNCIAS EM LOTE ======================= */
-/* Um produto -> várias filiais, gerando uma transferência (e um financeiro)
-   separada para cada filial.                                            */
-S.lote = { produtoId:'', qtds:{}, pag:{} };
+/* =================== TRANSFERÊNCIAS EM LOTE =======================
+   Vários produtos -> várias filiais. A distribuição de cada produto
+   fica guardada, e no fim sai UMA transferência por filial, com todos
+   os produtos destinados a ela e financeiro próprio.                 */
+S.lote = { produtoId:'', dist:{}, pag:{} };
 
 function abrirLote(){
   if(!S.filiais.length){ toast('Cadastre as filiais antes (engrenagem → Filiais).','erro'); return; }
   renderLoteProdutos(); renderLotePainel(); abrir('modalLote');
 }
-function limparLote(){ S.lote = {produtoId:'', qtds:{}, pag:{}}; renderLoteProdutos(); renderLotePainel(); }
+function limparLote(){
+  if(Object.keys(S.lote.dist).length && !confirm('Limpar toda a distribuição já feita?')) return;
+  S.lote = {produtoId:'', dist:{}, pag:{}}; renderLoteProdutos(); renderLotePainel();
+}
 
+/* ---- helpers ---- */
+function loteQtd(produtoId, filialId){ return num((S.lote.dist[produtoId]||{})[filialId]||0); }
+function loteDistribuido(produtoId){
+  return Object.values(S.lote.dist[produtoId]||{}).reduce((a,v)=>a+num(v),0);
+}
+function loteSaldoProduto(p){ return num(p.quantidade) - loteDistribuido(p.id); }
+function loteProduto(){ return S.produtos.find(p=>p.id===S.lote.produtoId); }
+function loteProdutosNaLista(){
+  return Object.keys(S.lote.dist)
+    .map(id=>S.produtos.find(p=>p.id===id))
+    .filter(p=>p && loteDistribuido(p.id)>0);
+}
+function loteFiliaisComItens(){
+  return S.filiais.filter(f=> loteProdutosNaLista().some(p=>loteQtd(p.id,f.id)>0));
+}
+function loteItensDaFilial(f){
+  return loteProdutosNaLista().filter(p=>loteQtd(p.id,f.id)>0).map(p=>{
+    const q = loteQtd(p.id,f.id), preco = num(p.precoVenda);
+    return { produtoId:p.id, codigo:p.codigo, descricao:p.descricao, quantidade:q,
+             precoUnit:preco, total:q*preco, codigoBarras:p.codigoBarras||'',
+             fotoId:fotosDoProduto(p)[0]||'' };
+  });
+}
+function loteTotalFilial(f){ return loteItensDaFilial(f).reduce((a,i)=>a+i.total,0); }
+function loteTotalGeral(){ return loteFiliaisComItens().reduce((a,f)=>a+loteTotalFilial(f),0); }
+
+/* ---- grade de produtos ---- */
 function loteProdutosDisponiveis(){
   const q = ($('loteBusca').value||'').trim().toLowerCase();
   return S.produtos.filter(p=> num(p.quantidade)>0 &&
@@ -2194,8 +2228,10 @@ function renderLoteProdutos(){
   const lista = loteProdutosDisponiveis();
   $('loteProdutos').innerHTML = lista.length ? lista.map(p=>{
     const foto = fotosDoProduto(p)[0];
-    return `<div class="lote-card ${S.lote.produtoId===p.id?'on':''}" onclick="selecionarLote('${p.id}')">
-      <span class="badge">${inteiro(p.quantidade)}</span>
+    const dist = loteDistribuido(p.id);
+    return `<div class="lote-card ${S.lote.produtoId===p.id?'on':''} ${dist>0?'usado':''}" onclick="selecionarLote('${p.id}')">
+      <span class="badge">${inteiro(loteSaldoProduto(p))}</span>
+      ${dist>0?`<span class="badge-dist">${inteiro(dist)} distribuídas</span>`:''}
       <div class="im">${foto?`<img src="${fotoMedia(foto)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:10px;font-weight:800">SEM FOTO</span>'}</div>
       <div class="tx"><b>${esc(p.descricao)}</b>
         <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> • ${moeda(p.precoVenda)}</div>
@@ -2204,90 +2240,118 @@ function renderLoteProdutos(){
   : '<div class="vazio" style="grid-column:1/-1"><b>Nenhum produto com estoque</b>Só aparecem aqui itens com saldo no CD.</div>';
 }
 function selecionarLote(id){
-  if(S.lote.produtoId !== id){ S.lote.produtoId = id; S.lote.qtds = {}; }
+  S.lote.produtoId = (S.lote.produtoId === id) ? '' : id;   // clicar de novo desmarca
   renderLoteProdutos(); renderLotePainel();
 }
 
-function loteProduto(){ return S.produtos.find(p=>p.id===S.lote.produtoId); }
-function loteUsado(){ return Object.values(S.lote.qtds).reduce((a,v)=>a+num(v),0); }
-function loteSaldo(){ const p = loteProduto(); return p ? num(p.quantidade)-loteUsado() : 0; }
-
+/* ---- painel de distribuição ---- */
 function renderLotePainel(){
   const p = loteProduto();
   if(!p){
-    $('loteCabecalho').innerHTML = '<div class="vazio" style="padding:20px"><b>Selecione um produto</b>As filiais aparecem aqui para distribuir a quantidade.</div>';
-    $('loteFiliais').innerHTML = ''; $('loteResumo').innerHTML =
-      '<div style="color:var(--cinza);font-size:12.5px">Nenhum produto selecionado.</div>';
-    return;
+    $('loteCabecalho').innerHTML = '<div class="vazio" style="padding:20px"><b>Selecione um produto</b>As filiais aparecem aqui para distribuir a quantidade. A distribuição já feita fica guardada.</div>';
+    $('loteFiliais').innerHTML = '';
+  } else {
+    const foto = fotosDoProduto(p)[0];
+    const saldo = loteSaldoProduto(p);
+    $('loteCabecalho').innerHTML = `
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="foto-cel" style="width:62px;height:62px;cursor:default">
+          ${foto?`<img src="${fotoMedia(foto)}">`:''}</div>
+        <div style="flex:1;min-width:0">
+          <b style="display:block">${esc(p.descricao)}</b>
+          <small class="mono" style="color:var(--cinza)">${esc(p.codigo)} • ${moeda(p.precoVenda)} / un</small>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <div style="flex:1;background:${saldo<0?'var(--vermelho-bg)':'#f6f7f8'};border-radius:9px;padding:9px 12px">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">SALDO NO CD</div>
+          <div style="font-size:21px;font-weight:800;color:${saldo<0?'var(--vermelho)':'var(--tinta)'}">${inteiro(saldo)} un</div>
+        </div>
+        <div style="flex:1;background:#fff7ef;border-radius:9px;padding:9px 12px">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
+          <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteDistribuido(p.id))} un</div>
+        </div>
+      </div>`;
+    $('loteFiliais').innerHTML = S.filiais.map(f=>{
+      const q = loteQtd(p.id, f.id);
+      return `<tr>
+        <td><b>${esc(f.nome)}</b>${f.cnpj?`<br><small class="mono" style="color:var(--cinza)">${esc(f.cnpj)}</small>`:''}</td>
+        <td class="num"><input type="number" min="0" step="1" value="${q||''}" placeholder="0"
+          style="width:100px;text-align:right" onchange="mudarQtdLote('${f.id}', this.value)"></td>
+        <td class="num">${q?('<b>'+moeda(q*num(p.precoVenda))+'</b>'):'—'}</td>
+      </tr>`;
+    }).join('');
   }
-  const foto = fotosDoProduto(p)[0];
-  const saldo = loteSaldo();
-  $('loteCabecalho').innerHTML = `
-    <div style="display:flex;gap:12px;align-items:center">
-      <div class="foto-cel" style="width:62px;height:62px;cursor:default">
-        ${foto?`<img src="${fotoMedia(foto)}">`:''}</div>
-      <div style="flex:1;min-width:0">
-        <b style="display:block">${esc(p.descricao)}</b>
-        <small class="mono" style="color:var(--cinza)">${esc(p.codigo)} • ${moeda(p.precoVenda)} / un</small>
-      </div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <div style="flex:1;background:${saldo<0?'var(--vermelho-bg)':'#f6f7f8'};border-radius:9px;padding:9px 12px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">SALDO NO CD</div>
-        <div style="font-size:21px;font-weight:800;color:${saldo<0?'var(--vermelho)':'var(--tinta)'}">${inteiro(saldo)} un</div>
-      </div>
-      <div style="flex:1;background:#fff7ef;border-radius:9px;padding:9px 12px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
-        <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteUsado())} un</div>
-      </div>
-    </div>`;
-
-  $('loteFiliais').innerHTML = S.filiais.map(f=>{
-    const q = num(S.lote.qtds[f.id]||0);
-    return `<tr>
-      <td><b>${esc(f.nome)}</b>${f.cnpj?`<br><small class="mono" style="color:var(--cinza)">${esc(f.cnpj)}</small>`:''}</td>
-      <td class="num"><input type="number" min="0" step="1" value="${q||''}" placeholder="0"
-        style="width:100px;text-align:right" onchange="mudarQtdLote('${f.id}', this.value)"></td>
-      <td class="num">${q?('<b>'+moeda(q*num(p.precoVenda))+'</b>'):'—'}</td>
-    </tr>`;
-  }).join('');
-
-  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
-  const totalQ = loteUsado(), totalV = totalQ*num(p.precoVenda);
-  $('loteResumo').innerHTML = linhas.length
-    ? `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
-        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">TRANSFERÊNCIAS A GERAR</span>
-          <div style="font-size:20px;font-weight:800">${linhas.length}</div></div>
-        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">PEÇAS</span>
-          <div style="font-size:20px;font-weight:800">${inteiro(totalQ)}</div></div>
-        <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">VALOR TOTAL</span>
-          <div style="font-size:20px;font-weight:800">${moeda(totalV)}</div></div>
-        <div style="flex:1;min-width:220px;color:var(--cinza);font-size:12.5px">
-          ${linhas.map(f=>esc(f.nome)+': '+inteiro(S.lote.qtds[f.id])+' un').join(' • ')}</div>
-      </div>`
-    : '<div style="color:var(--cinza);font-size:12.5px">Informe a quantidade de cada filial ao lado.</div>';
+  renderLoteResumo();
 }
 function mudarQtdLote(filialId, valor){
   const p = loteProduto(); if(!p) return;
   let q = Math.max(0, Math.round(num(valor)));
-  const outras = Object.keys(S.lote.qtds).filter(k=>k!==filialId)
-    .reduce((a,k)=>a+num(S.lote.qtds[k]),0);
+  const outras = loteDistribuido(p.id) - loteQtd(p.id, filialId);
   if(q + outras > num(p.quantidade)){
     q = Math.max(0, num(p.quantidade)-outras);
     toast('Estoque disponível: '+inteiro(num(p.quantidade)-outras)+' un.','erro');
   }
-  if(q) S.lote.qtds[filialId] = q; else delete S.lote.qtds[filialId];
-  renderLotePainel();
+  S.lote.dist[p.id] = S.lote.dist[p.id] || {};
+  if(q) S.lote.dist[p.id][filialId] = q; else delete S.lote.dist[p.id][filialId];
+  if(!Object.keys(S.lote.dist[p.id]).length) delete S.lote.dist[p.id];
+  renderLotePainel(); renderLoteProdutos();
 }
 $('loteBusca').addEventListener('input', renderLoteProdutos);
 
+/* ---- resumo de tudo que foi montado ---- */
+function renderLoteResumo(){
+  const prods = loteProdutosNaLista(), fils = loteFiliaisComItens();
+  if(!prods.length){
+    $('loteResumo').innerHTML = '<div style="color:var(--cinza);font-size:12.5px">Nenhuma quantidade distribuída ainda. Selecione um produto e informe as quantidades por filial. Depois escolha outro produto — a distribuição anterior fica guardada.</div>';
+    return;
+  }
+  const totQ = prods.reduce((a,p)=>a+loteDistribuido(p.id),0);
+  $('loteResumo').innerHTML = `
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">PRODUTOS</span>
+        <div style="font-size:20px;font-weight:800">${prods.length}</div></div>
+      <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">TRANSFERÊNCIAS A GERAR</span>
+        <div style="font-size:20px;font-weight:800">${fils.length}</div></div>
+      <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">PEÇAS</span>
+        <div style="font-size:20px;font-weight:800">${inteiro(totQ)}</div></div>
+      <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">VALOR TOTAL</span>
+        <div style="font-size:20px;font-weight:800">${moeda(loteTotalGeral())}</div></div>
+    </div>
+    <div class="tabela-wrap" style="max-height:260px">
+      <table><thead><tr><th>Produto</th>
+        ${fils.map(f=>`<th class="num">${esc(f.nome)}</th>`).join('')}
+        <th class="num">Total</th><th class="num" style="width:50px"></th></tr></thead>
+        <tbody>
+          ${prods.map(p=>`<tr>
+            <td><b class="mono">${esc(p.codigo)}</b><br><small>${esc(p.descricao)}</small></td>
+            ${fils.map(f=>{ const q=loteQtd(p.id,f.id);
+              return `<td class="num">${q?('<b>'+inteiro(q)+'</b>'):'<span style="color:var(--cinza-claro)">—</span>'}</td>`;
+            }).join('')}
+            <td class="num"><b>${inteiro(loteDistribuido(p.id))}</b></td>
+            <td class="num"><button class="btn mini perigo" title="Tirar do lote"
+              onclick="removerProdutoLote('${p.id}')">×</button></td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:#fafbfc">
+          <td style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">VALOR POR FILIAL</td>
+          ${fils.map(f=>`<td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(loteTotalFilial(f))}</td>`).join('')}
+          <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(loteTotalGeral())}</td>
+          <td style="border-top:2px solid var(--linha)"></td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+function removerProdutoLote(id){
+  delete S.lote.dist[id];
+  renderLoteProdutos(); renderLotePainel();
+}
+
 /* --------- pagamento por filial --------- */
 function irPagamentoLote(){
-  const p = loteProduto();
-  if(!p){ toast('Selecione o produto.','erro'); return; }
-  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
-  if(!linhas.length){ toast('Informe a quantidade de ao menos uma filial.','erro'); return; }
-  linhas.forEach(f=>{
+  const fils = loteFiliaisComItens();
+  if(!fils.length){ toast('Distribua ao menos um produto para uma filial.','erro'); return; }
+  fils.forEach(f=>{
     if(!S.lote.pag[f.id]) S.lote.pag[f.id] = {forma:'Boleto', parcelas:1, primeiro:somarDias(hoje(),30), intervalo:30};
   });
   $('lpPrimeiro').value = somarDias(hoje(),30);
@@ -2296,7 +2360,7 @@ function irPagamentoLote(){
 function aplicarPagamentoTodas(){
   const base = {forma:$('lpForma').value, parcelas:Math.max(1,Math.round(num($('lpParcelas').value))||1),
     primeiro:$('lpPrimeiro').value||somarDias(hoje(),30), intervalo:Math.max(1,Math.round(num($('lpIntervalo').value))||30)};
-  Object.keys(S.lote.pag).forEach(id=> S.lote.pag[id] = {...base});
+  loteFiliaisComItens().forEach(f=> S.lote.pag[f.id] = {...base});
   renderLotePagamento(); toast('Condição aplicada a todas as filiais.','ok');
 }
 function mudarPagLote(filialId, campo, valor){
@@ -2316,14 +2380,14 @@ function parcelasLote(valor, cond){
   return out;
 }
 function renderLotePagamento(){
-  const p = loteProduto(); if(!p) return;
-  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
-  $('tbLotePagamento').innerHTML = linhas.map(f=>{
-    const q = num(S.lote.qtds[f.id]), v = q*num(p.precoVenda), c = S.lote.pag[f.id];
+  const fils = loteFiliaisComItens();
+  $('tbLotePagamento').innerHTML = fils.map(f=>{
+    const itens = loteItensDaFilial(f);
+    const qtd = itens.reduce((a,i)=>a+i.quantidade,0), v = loteTotalFilial(f), c = S.lote.pag[f.id];
     const parc = parcelasLote(v, c);
     return `<tr>
-      <td><b>${esc(f.nome)}</b></td>
-      <td class="num">${inteiro(q)}</td>
+      <td><b>${esc(f.nome)}</b><br><small style="color:var(--cinza)">${itens.length} produto(s)</small></td>
+      <td class="num">${inteiro(qtd)}</td>
       <td class="num"><b>${moeda(v)}</b></td>
       <td><select onchange="mudarPagLote('${f.id}','forma',this.value)" style="width:150px">
         ${['Boleto','PIX','Transferência bancária','Cartão de crédito','Dinheiro','Débito em conta']
@@ -2338,35 +2402,35 @@ function renderLotePagamento(){
         ${parc.map(x=>`${x.parcela}/${x.totalParcelas} ${dataBR(x.vencimento)} — <b>${moeda(x.valor)}</b>`).join('<br>')}</td>
     </tr>`;
   }).join('');
-  const totQ = loteUsado(), totV = totQ*num(p.precoVenda);
+  const totQ = fils.reduce((a,f)=>a+loteItensDaFilial(f).reduce((b,i)=>b+i.quantidade,0),0);
   $('tfLotePagamento').innerHTML = `<tr style="background:#fafbfc">
     <td style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL</td>
     <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(totQ)}</td>
-    <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${moeda(totV)}</td>
+    <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${moeda(loteTotalGeral())}</td>
     <td colspan="5" style="border-top:2px solid var(--linha);color:var(--cinza);font-size:12px">
-      ${linhas.length} transferência(s) serão emitidas, cada uma com recibo e financeiro próprios</td></tr>`;
+      ${fils.length} transferência(s) serão emitidas, cada uma com recibo e financeiro próprios</td></tr>`;
 }
 
 async function confirmarLote(){
-  const p = loteProduto(); if(!p) return;
-  const linhas = S.filiais.filter(f=>num(S.lote.qtds[f.id]||0)>0);
-  if(!linhas.length){ toast('Nenhuma filial com quantidade.','erro'); return; }
-  if(!confirm('Gerar '+linhas.length+' transferência(s) do produto '+p.codigo+'?')) return;
+  const fils = loteFiliaisComItens();
+  if(!fils.length){ toast('Nenhuma filial com quantidade.','erro'); return; }
+  const prods = loteProdutosNaLista();
+  if(!confirm('Gerar '+fils.length+' transferência(s) com '+prods.length+' produto(s)?')) return;
   const emitidas = [];
   try{
     let i=0;
-    for(const f of linhas){
-      i++; carregando(true,'Emitindo transferência '+i+'/'+linhas.length+' — '+f.nome+'…');
-      const q = num(S.lote.qtds[f.id]), preco = num(p.precoVenda), total = q*preco;
+    for(const f of fils){
+      i++; carregando(true,'Emitindo transferência '+i+'/'+fils.length+' — '+f.nome+'…');
+      const itens = loteItensDaFilial(f);
+      const total = itens.reduce((a,x)=>a+x.total,0);
       const transferencia = { data: hoje(), filialId:f.id, filialNome:f.nome, filialCnpj:f.cnpj||'',
-        qtdItens:q, valorTotal:total, formaPagamento:S.lote.pag[f.id].forma,
-        qtdParcelas:S.lote.pag[f.id].parcelas, obs:'Transferência em lote' };
-      const itens = [{ produtoId:p.id, codigo:p.codigo, descricao:p.descricao, quantidade:q,
-        precoUnit:preco, total, codigoBarras:p.codigoBarras||'', fotoId:fotosDoProduto(p)[0]||'' }];
+        qtdItens: itens.reduce((a,x)=>a+x.quantidade,0), valorTotal: total,
+        formaPagamento:S.lote.pag[f.id].forma, qtdParcelas:S.lote.pag[f.id].parcelas,
+        obs:'Transferência em lote' };
       const r = await api('criarTransferencia', {transferencia, itens, parcelas: parcelasLote(total, S.lote.pag[f.id])});
       emitidas.push(r.transferencia.numero);
     }
-    S.versao=''; limparLote();
+    S.versao=''; S.lote = {produtoId:'', dist:{}, pag:{}};
     fechar('modalLotePagamento');
     await sincronizar(true);
     toast(emitidas.length+' transferência(s) emitida(s): nº '+emitidas.join(', '),'ok');
