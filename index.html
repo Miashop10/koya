@@ -127,21 +127,22 @@ tr.dragover td{background:#fff8f1}
 .rel-item .d td{border:0;padding:.3mm 0}
 .rel-item .d td:last-child{text-align:right;font-weight:800}
 
-.lote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;
-  flex:1;min-height:0;overflow:auto;padding:2px;align-content:start}
-.lote-card{border:2px solid var(--linha);border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;position:relative}
-.lote-card:hover{border-color:var(--cinza-claro)}
-.lote-card.on{border-color:var(--laranja);box-shadow:0 0 0 3px rgba(241,134,52,.18)}
-.lote-card .im{height:110px;display:flex;align-items:center;justify-content:center;background:#f7f8f9}
+.lote-grid{display:flex;flex-direction:column;gap:5px;flex:1;min-height:0;overflow:auto;padding:2px}
+.lote-card{display:flex;align-items:center;gap:10px;border:2px solid var(--linha);border-radius:10px;
+  padding:6px 10px 6px 6px;cursor:pointer;background:#fff}
+.lote-card:hover{border-color:var(--cinza-claro);background:#fcfcfd}
+.lote-card.on{border-color:var(--laranja);background:#fff8f2;box-shadow:0 0 0 2px rgba(241,134,52,.18)}
+.lote-card .im{flex:0 0 54px;width:54px;height:54px;border-radius:8px;overflow:hidden;background:#f7f8f9;
+  display:flex;align-items:center;justify-content:center}
 .lote-card .im img{max-width:100%;max-height:100%;object-fit:contain}
-.lote-card .tx{padding:7px 9px;font-size:11.5px;line-height:1.35}
-.lote-card .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lote-card .badge{position:absolute;top:6px;right:6px;background:var(--verde);color:#fff;border-radius:99px;
-  padding:1px 7px;font-size:10px;font-weight:900}
+.lote-card .tx{flex:1;min-width:0;font-size:12px;line-height:1.35}
+.lote-card .tx b{display:block;font-size:12.5px;white-space:normal;overflow-wrap:anywhere}
+.lote-card .dir{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.lote-card .badge{background:var(--verde);color:#fff;border-radius:99px;padding:1px 8px;font-size:10.5px;font-weight:900}
 .modal-cx.cheio{max-width:none;width:100vw;height:100vh;max-height:100vh;border-radius:0;
   display:flex;flex-direction:column}
 .modal-cx.cheio .modal-corpo{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:14px 18px}
-.lote-colunas{flex:1;min-height:0;display:grid;grid-template-columns:.72fr 1.28fr;gap:16px}
+.lote-colunas{flex:1;min-height:0;display:grid;grid-template-columns:minmax(330px,.85fr) 1.15fr;gap:16px}
 .lote-col{min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .lote-resumo{border:1px solid var(--linha);border-radius:var(--raio);background:var(--branco);
   box-shadow:var(--sombra);flex:0 0 auto;max-height:34vh;overflow:auto}
@@ -164,8 +165,8 @@ tr.dragover td{background:#fff8f1}
 @media(max-width:900px){.fil-grid{grid-template-columns:1fr}}
 
 .lote-card.usado{border-color:var(--laranja)}
-.lote-card .badge-dist{position:absolute;top:6px;left:6px;background:var(--laranja);color:#fff;border-radius:99px;
-  padding:1px 7px;font-size:10px;font-weight:900}
+.lote-card .badge-dist{background:var(--laranja);color:#fff;border-radius:99px;
+  padding:1px 8px;font-size:10.5px;font-weight:900}
 
 .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
@@ -2328,12 +2329,15 @@ function renderLoteProdutos(){
   $('loteProdutos').innerHTML = lista.length ? lista.map(p=>{
     const foto = fotosDoProduto(p)[0];
     const dist = loteDistribuido(p.id);
-    return `<div class="lote-card ${S.lote.produtoId===p.id?'on':''} ${dist>0?'usado':''}" onclick="selecionarLote('${p.id}')">
-      <span class="badge">${inteiro(loteSaldoProduto(p))}</span>
-      ${dist>0?`<span class="badge-dist">${inteiro(dist)} distribuídas</span>`:''}
-      <div class="im">${foto?`<img src="${fotoMedia(foto)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:10px;font-weight:800">SEM FOTO</span>'}</div>
+    return `<div class="lote-card ${S.lote.produtoId===p.id?'on':''} ${dist>0?'usado':''}"
+         onclick="selecionarLote('${p.id}')" title="${esc(p.descricao)}">
+      <div class="im">${foto?`<img src="${fotoMedia(foto)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:9px;font-weight:800">SEM<br>FOTO</span>'}</div>
       <div class="tx"><b>${esc(p.descricao)}</b>
         <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> • ${moeda(p.precoVenda)}</div>
+      <div class="dir">
+        <span class="badge" title="saldo disponível">${inteiro(loteSaldoProduto(p))}</span>
+        ${dist>0?`<span class="badge-dist" title="já distribuídas">${inteiro(dist)}</span>`:''}
+      </div>
     </div>`;
   }).join('')
   : '<div class="vazio" style="grid-column:1/-1"><b>Nenhum produto com estoque</b>Só aparecem aqui itens com saldo no CD.</div>';
