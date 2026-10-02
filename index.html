@@ -40,6 +40,14 @@ nav button:hover{color:var(--preto)}
 nav button.ativo{color:var(--preto);border-bottom-color:var(--laranja)}
 
 main{max-width:1480px;margin:0 auto;padding:22px 20px 80px}
+#aba-estoque.ativa{max-width:none;width:calc(100vw - 28px);margin-left:calc(50% - 50vw + 14px)}
+#aba-estoque table{font-size:12px}
+#aba-estoque th{padding:8px 7px;font-size:9.5px;letter-spacing:.4px;line-height:1.25}
+#aba-estoque td{padding:6px 7px}
+#aba-estoque td.num,#aba-estoque th.num{white-space:nowrap}
+#aba-estoque .tabela-wrap{max-height:74vh}
+#aba-estoque .foto-cel{width:74px;height:74px}
+#aba-estoque .btn.mini{padding:4px 7px;font-size:11px}
 .aba{display:none} .aba.ativa{display:block}
 
 /* ---------- COMPONENTES ---------- */
@@ -167,6 +175,12 @@ tr.dragover td{background:#fff8f1}
 .lote-card.usado{border-color:var(--laranja)}
 .lote-card .badge-dist{background:var(--laranja);color:#fff;border-radius:99px;
   padding:1px 8px;font-size:10.5px;font-weight:900}
+
+th.ord{cursor:pointer;user-select:none;white-space:nowrap}
+th.ord:hover{color:var(--preto)}
+th.ord::after{content:' ↕';opacity:.35;font-size:10px}
+th.ord.asc::after{content:' ↑';opacity:1;color:var(--laranja)}
+th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
 
 .leg{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:var(--cinza)}
 .leg i{width:11px;height:11px;border-radius:3px;display:inline-block}
@@ -397,11 +411,17 @@ tr.dragover td{background:#fff8f1}
     <table>
       <thead><tr>
         <th style="width:34px"><input type="checkbox" id="chkTodos" onclick="marcarTodos(this.checked)" style="width:auto"></th>
-        <th style="width:104px">Foto</th><th>Código</th><th>Descrição</th>
-        <th>Recebimento</th><th class="num">Qtde estoque</th><th class="num">Qtde vendida</th><th class="num">Custo China</th><th class="num">Valor total custo</th>
-        <th class="num">Preço venda Miashop</th><th class="num">Valor total venda Miashop</th>
-        <th class="num">Preço venda loja</th><th class="num">Valor total venda loja</th>
-        <th>Código de barras</th><th class="num" style="width:120px">Ações</th>
+        <th style="width:86px">Foto</th><th>Código</th><th>Descrição</th>
+        <th>Recebimento</th>
+        <th class="num" title="Quantidade em estoque no CD">Qtde<br>estoque</th>
+        <th class="num" title="Quantidade já vendida às filiais">Qtde<br>vendida</th>
+        <th class="num">Custo<br>China</th>
+        <th class="num" title="Qtde em estoque × custo na China">Total<br>custo</th>
+        <th class="num">Venda<br>Miashop</th>
+        <th class="num" title="Qtde em estoque × preço de venda Miashop">Total venda<br>Miashop</th>
+        <th class="num">Venda<br>loja</th>
+        <th class="num" title="Qtde em estoque × preço de venda loja">Total venda<br>loja</th>
+        <th>Cód. barras</th><th class="num" style="width:96px">Ações</th>
       </tr></thead>
       <tbody id="tbProdutos"></tbody>
       <tfoot id="tfProdutos"></tfoot>
@@ -429,7 +449,7 @@ tr.dragover td{background:#fff8f1}
         <label>Adicionar produto</label>
         <input type="search" id="buscaTransf" placeholder="Digite código, descrição ou EAN…">
       </div>
-      <div class="lista-prod" id="listaTransf"></div>
+      <div class="lote-grid" id="listaTransf" style="max-height:360px;border:1px solid var(--linha);border-radius:8px;padding:6px"></div>
       <h3 style="margin:18px 0 10px;font-size:14px">Itens da transferência</h3>
       <div class="tabela-wrap" style="max-height:300px">
         <table><thead><tr>
@@ -503,8 +523,10 @@ tr.dragover td{background:#fff8f1}
     <div class="card">
       <div class="card-pad" style="border-bottom:1px solid var(--linha)"><h3 style="font-size:14px">Mercadorias vendidas no período</h3></div>
       <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
-        <table><thead><tr><th style="width:56px"></th><th>Produto</th><th class="num">Qtde</th><th class="num">Valor</th></tr></thead>
-        <tbody id="tbRelProdutos"></tbody></table>
+        <table><thead><tr><th style="width:56px"></th><th>Produto</th>
+          <th class="num ord" id="ordQtd" onclick="ordenarRelProdutos('qtd')">Qtde</th>
+          <th class="num ord" id="ordValor" onclick="ordenarRelProdutos('valor')">Valor</th></tr></thead>
+        <tbody id="tbRelProdutos"></tbody><tfoot id="tfRelProdutos"></tfoot></table>
       </div>
     </div>
     <div class="card">
@@ -2148,16 +2170,23 @@ function renderSelects(){
 $('buscaTransf').addEventListener('input', renderBuscaTransf);
 function renderBuscaTransf(){
   const q = ($('buscaTransf').value||'').trim().toLowerCase();
-  const lista = (q ? S.produtos.filter(p=>[p.codigo,p.descricao,p.codigoBarras]
-      .some(v=>String(v||'').toLowerCase().includes(q))) : S.produtos).slice(0,60);
-  $('listaTransf').innerHTML = lista.length ? lista.map(p=>`
-    <div class="item" onclick="addCarrinho('${p.id}')">
-      ${p.fotoId?`<img src="${fotoMedia(p.fotoId)}" alt="">`:'<div style="width:38px;height:38px;border-radius:6px;background:#f1f2f4"></div>'}
-      <div class="txt"><div>${esc(p.descricao)}</div>
-        <small class="mono">${esc(p.codigo)} • estoque ${inteiro(p.quantidade)} • ${moeda(p.precoVenda)}</small></div>
-      <span class="btn mini">+ Add</span>
-    </div>`).join('')
-    : '<div class="vazio" style="padding:22px">Nenhum produto encontrado.</div>';
+  // só o que tem saldo no CD, com foto — igual às transferências em lote
+  const lista = S.produtos.filter(p=> num(p.quantidade)>0 &&
+    (!q || [p.codigo,p.descricao,p.codigoBarras,p.setor].some(v=>String(v||'').toLowerCase().includes(q))));
+  $('listaTransf').innerHTML = lista.length ? lista.map(p=>{
+    const foto = fotosDoProduto(p)[0];
+    const noCarrinho = num((S.carrinho.find(i=>i.produtoId===p.id)||{}).quantidade);
+    return `<div class="lote-card ${noCarrinho?'usado':''}" onclick="addCarrinho('${p.id}')" title="${esc(p.descricao)}">
+      <div class="im">${foto?`<img src="${fotoMedia(foto)}" loading="lazy">`:'<span style="color:var(--cinza-claro);font-size:9px;font-weight:800">SEM<br>FOTO</span>'}</div>
+      <div class="tx"><b>${esc(p.descricao)}</b>
+        <span class="mono" style="color:var(--cinza)">${esc(p.codigo)}</span> • ${moeda(p.precoVenda)}</div>
+      <div class="dir">
+        <span class="badge" title="saldo disponível">${inteiro(num(p.quantidade)-noCarrinho)}</span>
+        ${noCarrinho?`<span class="badge-dist" title="já nesta transferência">${inteiro(noCarrinho)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('')
+    : '<div class="vazio" style="padding:22px">Nenhum produto com estoque encontrado.</div>';
 }
 function addCarrinho(id){
   const p = S.produtos.find(x=>x.id===id); if(!p) return;
@@ -2179,6 +2208,7 @@ function removerItem(i){ S.carrinho.splice(i,1); renderCarrinho(); }
 function limparCarrinho(){ S.carrinho=[]; renderCarrinho(); }
 function totalCarrinho(){ return S.carrinho.reduce((a,i)=>a+num(i.quantidade)*num(i.precoUnit),0); }
 function renderCarrinho(){
+  if($('listaTransf')) renderBuscaTransf();
   $('tbCarrinho').innerHTML = S.carrinho.length ? S.carrinho.map((i,ix)=>`
     <tr>
       <td class="mono">${esc(i.codigo)}</td><td>${esc(i.descricao)}</td>
@@ -2909,6 +2939,12 @@ function totalRodape(colspan, rotulo, valor, sobra){
     <td class="num" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">${moeda(valor)}</td>
     ${sobra?`<td colspan="${sobra}" style="border-top:2px solid var(--linha)"></td>`:''}</tr>`;
 }
+let ordemRel = {campo:'qtd', desc:true};
+function ordenarRelProdutos(campo){
+  if(ordemRel.campo === campo) ordemRel.desc = !ordemRel.desc;
+  else ordemRel = {campo, desc:true};
+  renderRelatorios();
+}
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 function montarFiltrosRel(){
   $('fRelMes').innerHTML = '<option value="">Todos os meses</option>'+
@@ -2941,12 +2977,22 @@ function renderRelatorios(){
     porProd[k] = porProd[k] || {codigo:i.codigo, descricao:i.descricao, fotoId:i.fotoId, qtd:0, valor:0};
     porProd[k].qtd += num(i.quantidade); porProd[k].valor += num(i.total);
   });
-  const listaProd = Object.values(porProd).sort((a,b)=>b.qtd-a.qtd);
+  const listaProd = Object.values(porProd).sort((a,b)=>{
+    const d = ordemRel.campo==='valor' ? (a.valor-b.valor) : (a.qtd-b.qtd);
+    return ordemRel.desc ? -d : d;
+  });
+  $('ordQtd').className   = 'num ord'+(ordemRel.campo==='qtd'   ? (ordemRel.desc?' desc':' asc') : '');
+  $('ordValor').className = 'num ord'+(ordemRel.campo==='valor' ? (ordemRel.desc?' desc':' asc') : '');
   $('tbRelProdutos').innerHTML = listaProd.length ? listaProd.map(p=>`
     <tr><td>${p.fotoId?`<div class="foto-cel" style="width:44px;height:44px" onclick="verFoto('${p.fotoId}','${esc(p.codigo)}')"><img src="${fotoMedia(p.fotoId)}"></div>`:''}</td>
       <td><b class="mono">${esc(p.codigo)}</b><br><small>${esc(p.descricao)}</small></td>
       <td class="num"><b>${inteiro(p.qtd)}</b></td><td class="num">${moeda(p.valor)}</td></tr>`).join('')
     : '<tr><td colspan="4"><div class="vazio">Sem vendas no período.</div></td></tr>';
+  $('tfRelProdutos').innerHTML = listaProd.length ? `<tr style="background:#fafbfc">
+    <td colspan="2" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(listaProd.reduce((a,x)=>a+x.qtd,0))}</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(listaProd.reduce((a,x)=>a+x.valor,0))}</td>
+  </tr>` : '';
 
   // por filial
   const porFil = {};
