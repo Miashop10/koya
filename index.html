@@ -314,6 +314,8 @@ tr.dragover td{background:#fff8f1}
   #reciboArea{padding:0}
   .pagina{box-shadow:none;margin:0;width:210mm;height:297mm}
   .pagina:last-child{page-break-after:auto}
+  .recibo-pag{border-bottom:0 !important;padding-bottom:0 !important;margin-bottom:0 !important}
+  .recibo-pag:last-child{page-break-after:auto !important}
   .pc,.pg-setor,.capa .faixas,.capa .setores span{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
@@ -438,7 +440,14 @@ tr.dragover td{background:#fff8f1}
     </div>
     <div class="card card-pad">
       <h3 style="margin-bottom:12px">Transferências emitidas</h3>
-      <input type="search" id="buscaTransfLista" placeholder="Buscar por número ou filial…" style="margin-bottom:12px">
+      <input type="search" id="buscaTransfLista" placeholder="Buscar por número ou filial…" style="margin-bottom:10px">
+      <div class="barra" style="margin-bottom:10px;gap:8px">
+        <button class="btn mini" onclick="marcarTransfTodas(true)">Selecionar todas</button>
+        <button class="btn mini" onclick="marcarTransfTodas(false)">Limpar</button>
+        <div class="espaco"></div>
+        <b id="transfSelResumo" style="font-size:12px;color:var(--cinza)"></b>
+        <button class="btn laranja mini" onclick="imprimirSelecionadas()">🖨 Imprimir selecionadas</button>
+      </div>
       <div id="listaTransferencias" style="max-height:640px;overflow:auto"></div>
     </div>
   </div>
@@ -883,15 +892,24 @@ tr.dragover td{background:#fff8f1}
       <button class="fechar" onclick="fechar('modalLotePagamento')">×</button></div>
     <div class="modal-corpo">
       <div class="card card-pad" style="margin-bottom:16px;background:#fff7ef;border-color:var(--laranja)">
+        <h3 style="font-size:13.5px;margin-bottom:12px">Aplicar a TODAS as filiais de uma vez</h3>
         <div class="grid g4">
           <div class="campo"><label>Forma de pagamento</label>
             <select id="lpForma"><option>Boleto</option><option>PIX</option><option>Transferência bancária</option>
-              <option>Cartão de crédito</option><option>Dinheiro</option><option>Débito em conta</option></select></div>
-          <div class="campo"><label>Parcelas</label><input type="number" id="lpParcelas" value="1" min="1" max="48"></div>
-          <div class="campo"><label>1º vencimento</label><input type="date" id="lpPrimeiro"></div>
-          <div class="campo"><label>Intervalo (dias)</label><input type="number" id="lpIntervalo" value="30" min="1"></div>
+              <option>Cartão de crédito</option><option>Dinheiro</option><option>Débito em conta</option></select>
+            <button class="btn mini" style="margin-top:6px;width:100%;justify-content:center"
+              onclick="aplicarCampoTodas('forma')">Aplicar só a forma</button></div>
+          <div class="campo"><label>1º vencimento</label><input type="date" id="lpPrimeiro">
+            <button class="btn mini" style="margin-top:6px;width:100%;justify-content:center"
+              onclick="aplicarCampoTodas('primeiro')">Aplicar só a data</button></div>
+          <div class="campo"><label>Parcelas</label><input type="number" id="lpParcelas" value="1" min="1" max="48">
+            <button class="btn mini" style="margin-top:6px;width:100%;justify-content:center"
+              onclick="aplicarCampoTodas('parcelas')">Aplicar só as parcelas</button></div>
+          <div class="campo"><label>Intervalo (dias)</label><input type="number" id="lpIntervalo" value="30" min="1">
+            <button class="btn mini" style="margin-top:6px;width:100%;justify-content:center"
+              onclick="aplicarCampoTodas('intervalo')">Aplicar só o intervalo</button></div>
         </div>
-        <button class="btn" onclick="aplicarPagamentoTodas()">Aplicar a todas as filiais</button>
+        <button class="btn laranja" onclick="aplicarPagamentoTodas()">Aplicar os quatro campos a todas as filiais</button>
       </div>
       <div class="tabela-wrap" style="max-height:52vh">
         <table><thead><tr><th>Filial</th><th class="num">Itens</th><th class="num">Valor</th>
@@ -1077,7 +1095,7 @@ const CONFIG = {
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            usuarios:[], recebimentos:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            usuarios:[], recebimentos:[], selTransf:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
             urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
@@ -1870,6 +1888,7 @@ function exportarXmlTransferencia(id){
     x.push('      <quantidade>'+num(i.quantidade)+'</quantidade>');
     x.push('      <custo>'+num(p.custoChina).toFixed(2)+'</custo>');
     x.push('      <preco>'+num(i.precoUnit).toFixed(2)+'</preco>');
+    x.push('      <precovendaloja>'+(num(i.precoLoja)||num(p.precoLoja)).toFixed(2)+'</precovendaloja>');
     x.push('      <total>'+num(i.total).toFixed(2)+'</total>');
     x.push('    </produto>');
   });
@@ -2158,9 +2177,12 @@ async function confirmarTransferencia(){
     qtdItens: S.carrinho.reduce((a,i)=>a+num(i.quantidade),0), valorTotal: totalCarrinho(),
     formaPagamento: $('finForma').value, qtdParcelas: S.parcelas.length, obs: $('finObs').value.trim()
   };
-  const itens = S.carrinho.map(i=>({ produtoId:i.produtoId, codigo:i.codigo, descricao:i.descricao,
-    quantidade:num(i.quantidade), precoUnit:num(i.precoUnit), total:num(i.quantidade)*num(i.precoUnit),
-    codigoBarras:i.codigoBarras, fotoId:i.fotoId }));
+  const itens = S.carrinho.map(i=>{
+    const pr = S.produtos.find(x=>x.id===i.produtoId) || {};
+    return { produtoId:i.produtoId, codigo:i.codigo, descricao:i.descricao,
+      quantidade:num(i.quantidade), precoUnit:num(i.precoUnit), total:num(i.quantidade)*num(i.precoUnit),
+      codigoBarras:i.codigoBarras, fotoId:i.fotoId, precoLoja:num(pr.precoLoja) };
+  });
   try{
     carregando(true,'Registrando transferência e gerando financeiro…');
     const r = await api('criarTransferencia', {transferencia, itens, parcelas:S.parcelas});
@@ -2179,10 +2201,13 @@ function renderTransferencias(){
   $('listaTransferencias').innerHTML = lista.length ? lista.map(t=>`
     <div style="border:1px solid var(--linha);border-radius:9px;padding:12px;margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <input type="checkbox" class="selTransf" value="${t.id}" style="width:auto;margin-top:3px"
+            ${S.selTransf.includes(t.id)?'checked':''} onclick="alternarTransf('${t.id}')">
         <div>
           <div style="font-weight:800">Nº ${esc(t.numero)} • ${esc(t.filialNome)}</div>
           <small style="color:var(--cinza)">${dataBR(t.data)} • ${inteiro(t.qtdItens)} peças • ${esc(t.formaPagamento||'')} ${num(t.qtdParcelas)>1?('em '+num(t.qtdParcelas)+'x'):''}</small>
-        </div>
+        </div></div>
         <div style="text-align:right"><b>${moeda(t.valorTotal)}</b></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -2192,6 +2217,7 @@ function renderTransferencias(){
       </div>
     </div>`).join('')
     : '<div class="vazio">Nenhuma transferência emitida.</div>';
+  atualizarResumoTransf();
 }
 $('buscaTransfLista').addEventListener('input', renderTransferencias);
 
@@ -2312,7 +2338,7 @@ function loteItensDaFilial(f){
     const q = loteQtd(p.id,f.id), preco = num(p.precoVenda);
     return { produtoId:p.id, codigo:p.codigo, descricao:p.descricao, quantidade:q,
              precoUnit:preco, total:q*preco, codigoBarras:p.codigoBarras||'',
-             fotoId:fotosDoProduto(p)[0]||'' };
+             fotoId:fotosDoProduto(p)[0]||'', precoLoja:num(p.precoLoja) };
   });
 }
 function loteTotalFilial(f){ return loteItensDaFilial(f).reduce((a,i)=>a+i.total,0); }
@@ -2529,6 +2555,17 @@ function irPagamentoLote(){
   $('lpPrimeiro').value = somarDias(hoje(),30);
   fechar('modalLote'); renderLotePagamento(); abrir('modalLotePagamento');
 }
+function aplicarCampoTodas(campo){
+  const v = { forma: $('lpForma').value,
+              primeiro: $('lpPrimeiro').value || somarDias(hoje(),30),
+              parcelas: Math.max(1, Math.round(num($('lpParcelas').value))||1),
+              intervalo: Math.max(1, Math.round(num($('lpIntervalo').value))||30) }[campo];
+  const fils = loteFiliaisComItens();
+  fils.forEach(f=>{ if(S.lote.pag[f.id]) S.lote.pag[f.id][campo] = v; });
+  renderLotePagamento();
+  const rotulo = {forma:'Forma de pagamento', primeiro:'1º vencimento', parcelas:'Parcelas', intervalo:'Intervalo'}[campo];
+  toast(rotulo+' aplicado(a) a '+fils.length+' filial(is).','ok');
+}
 function aplicarPagamentoTodas(){
   const base = {forma:$('lpForma').value, parcelas:Math.max(1,Math.round(num($('lpParcelas').value))||1),
     primeiro:$('lpPrimeiro').value||somarDias(hoje(),30), intervalo:Math.max(1,Math.round(num($('lpIntervalo').value))||30)};
@@ -2588,28 +2625,32 @@ async function confirmarLote(){
   if(!fils.length){ toast('Nenhuma filial com quantidade.','erro'); return; }
   const prods = loteProdutosNaLista();
   if(!confirm('Gerar '+fils.length+' transferência(s) com '+prods.length+' produto(s)?')) return;
-  const emitidas = [];
-  try{
-    let i=0;
-    for(const f of fils){
-      i++; carregando(true,'Emitindo transferência '+i+'/'+fils.length+' — '+f.nome+'…');
-      const itens = loteItensDaFilial(f);
-      const total = itens.reduce((a,x)=>a+x.total,0);
-      const transferencia = { data: hoje(), filialId:f.id, filialNome:f.nome, filialCnpj:f.cnpj||'',
+
+  // monta tudo de uma vez e envia numa única chamada ao Google
+  const lotes = fils.map(f=>{
+    const itens = loteItensDaFilial(f);
+    const total = itens.reduce((a,x)=>a+x.total,0);
+    return {
+      transferencia: { data: hoje(), filialId:f.id, filialNome:f.nome, filialCnpj:f.cnpj||'',
         qtdItens: itens.reduce((a,x)=>a+x.quantidade,0), valorTotal: total,
         formaPagamento:S.lote.pag[f.id].forma, qtdParcelas:S.lote.pag[f.id].parcelas,
-        obs:'Transferência em lote' };
-      const r = await api('criarTransferencia', {transferencia, itens, parcelas: parcelasLote(total, S.lote.pag[f.id])});
-      emitidas.push(r.transferencia.numero);
-    }
+        obs:'Transferência em lote' },
+      itens,
+      parcelas: parcelasLote(total, S.lote.pag[f.id])
+    };
+  });
+  try{
+    carregando(true,'Emitindo '+fils.length+' transferência(s)…');
+    const r = await api('criarTransferenciasLote', {lotes});
+    const nums = (r.transferencias||[]).map(x=>x.numero);
     S.versao=''; S.lote = {produtoId:'', dist:{}, pag:{}, copia:null, copiaDe:''};
     await apagarRascunhoLote();
     fechar('modalLotePagamento');
     await sincronizar(true);
-    toast(emitidas.length+' transferência(s) emitida(s): nº '+emitidas.join(', '),'ok');
+    toast(nums.length+' transferência(s) emitida(s): nº '+nums.join(', '),'ok');
   }catch(e){
     S.versao=''; await sincronizar(true);
-    toast('Erro após emitir '+emitidas.length+': '+e.message,'erro');
+    toast('Erro: '+e.message,'erro');
   } finally{ carregando(false); }
 }
 
@@ -2618,11 +2659,46 @@ const LOGO_SVG = '<img class="logo logo-recibo" src="'+LOGO+'">';
 
 function verRecibo(id){
   const t = S.transferencias.find(x=>x.id===id); if(!t) return;
+  $('reciboArea').innerHTML = htmlRecibo(t);
+  abrir('modalRecibo');
+}
+
+/* ---- seleção e impressão de várias transferências ---- */
+function alternarTransf(id){
+  const i = S.selTransf.indexOf(id);
+  if(i>=0) S.selTransf.splice(i,1); else S.selTransf.push(id);
+  atualizarResumoTransf();
+}
+function marcarTransfTodas(marcar){
+  const q = ($('buscaTransfLista').value||'').trim().toLowerCase();
+  const ids = S.transferencias
+    .filter(t=> !q || [t.numero,t.filialNome].some(v=>String(v||'').toLowerCase().includes(q)))
+    .map(t=>t.id);
+  S.selTransf = marcar ? ids : [];
+  renderTransferencias();
+}
+function atualizarResumoTransf(){
+  const n = S.selTransf.length;
+  $('transfSelResumo').textContent = n ? (n+' selecionada(s)') : '';
+  document.querySelectorAll('.selTransf').forEach(c=> c.checked = S.selTransf.includes(c.value));
+}
+function imprimirSelecionadas(){
+  if(!S.selTransf.length){ toast('Selecione as transferências que deseja imprimir.','erro'); return; }
+  const lista = S.transferencias.filter(t=>S.selTransf.includes(t.id))
+    .sort((a,b)=> String(a.numero).localeCompare(String(b.numero)));
+  $('reciboArea').innerHTML = lista.map((t,i)=>
+    `<div class="recibo-pag" style="${i<lista.length-1?'page-break-after:always;border-bottom:1px dashed #ccc;padding-bottom:18px;margin-bottom:18px':''}">${htmlRecibo(t)}</div>`
+  ).join('');
+  abrir('modalRecibo');
+  toast(lista.length+' recibo(s) prontos. Use Imprimir / PDF.','ok');
+}
+
+function htmlRecibo(t){
   const itens = S.itens.filter(i=>String(i.transferenciaId)===String(t.id));
   const parc = S.financeiro.filter(f=>String(f.transferenciaId)===String(t.id))
                  .sort((a,b)=>num(a.parcela)-num(b.parcela));
   const c = S.config;
-  $('reciboArea').innerHTML = `
+  return `
     <div class="cab">
       <div>${LOGO_SVG}
         <div style="margin-top:8px;font-size:11px;line-height:1.5">
@@ -2647,17 +2723,22 @@ function verRecibo(id){
     </div>
     <table>
       <thead><tr><th style="width:52px">Foto</th><th>Código</th><th>Descrição</th><th>Cód. barras</th>
-        <th style="text-align:right">Qtde</th><th style="text-align:right">Vlr unit.</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${itens.map(i=>`<tr>
+        <th style="text-align:right">Qtde</th><th style="text-align:right">Venda Miashop</th>
+        <th style="text-align:right">Venda loja</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${itens.map(i=>{
+        const pr = S.produtos.find(x=>String(x.id)===String(i.produtoId)) || {};
+        const loja = num(i.precoLoja) || num(pr.precoLoja);
+        return `<tr>
         <td>${i.fotoId?`<img class="fotinha" src="${fotoMedia(i.fotoId)}">`:''}</td>
         <td class="mono">${esc(i.codigo)}</td><td>${esc(i.descricao)}</td>
         <td class="mono">${esc(i.codigoBarras||'')}</td>
         <td style="text-align:right"><b>${inteiro(i.quantidade)}</b></td>
         <td style="text-align:right">${moeda(i.precoUnit)}</td>
-        <td style="text-align:right"><b>${moeda(i.total)}</b></td></tr>`).join('')}</tbody>
+        <td style="text-align:right">${loja>0?moeda(loja):'—'}</td>
+        <td style="text-align:right"><b>${moeda(i.total)}</b></td></tr>`;}).join('')}</tbody>
       <tfoot><tr><td colspan="4"></td>
         <td style="text-align:right;padding:8px"><b>${inteiro(t.qtdItens)}</b></td>
-        <td style="text-align:right;padding:8px">TOTAL</td>
+        <td colspan="2" style="text-align:right;padding:8px">TOTAL DA TRANSFERÊNCIA</td>
         <td style="text-align:right;padding:8px;font-size:15px"><b>${moeda(t.valorTotal)}</b></td></tr></tfoot>
     </table>
     <div class="aviso">
@@ -2676,7 +2757,6 @@ function verRecibo(id){
       <div>Responsável pela saída — Centro de Distribuição</div>
       <div>Recebido por — ${esc(t.filialNome)}</div>
     </div>`;
-  abrir('modalRecibo');
 }
 
 /* ============================= FINANCEIRO ========================== */
