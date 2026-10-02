@@ -168,6 +168,14 @@ tr.dragover td{background:#fff8f1}
 .lote-card .badge-dist{background:var(--laranja);color:#fff;border-radius:99px;
   padding:1px 8px;font-size:10.5px;font-weight:900}
 
+.leg{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:var(--cinza)}
+.leg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.g-barra{fill-opacity:1;transition:.15s}
+.g-barra:hover{fill-opacity:.82}
+#gfBarras svg, #gfFiliais svg{width:100%;height:auto;display:block;overflow:visible}
+.g-rot{font-size:10px;font-weight:700;fill:#6b7280}
+.g-val{font-size:9.5px;font-weight:800;fill:#1f2328}
+
 .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .galeria .g-item{border:2px solid var(--linha);border-radius:10px;overflow:hidden;background:#fbfbfc}
 .galeria .g-item.capa{border-color:var(--laranja)}
@@ -231,7 +239,7 @@ tr.dragover td{background:#fff8f1}
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;
   z-index:90;padding:20px;backdrop-filter:blur(2px)}
-#modalLote.aberto{padding:0}
+#modalLote.aberto,#modalGraficos.aberto{padding:0}
 .modal.aberto{display:flex}
 .modal-cx{background:var(--branco);border-radius:14px;width:100%;max-width:720px;max-height:92vh;overflow:auto;
   box-shadow:0 24px 60px rgba(0,0,0,.3)}
@@ -465,6 +473,7 @@ tr.dragover td{background:#fff8f1}
     <div style="width:170px"><input type="date" id="fFinAte" title="Vencimento até"></div>
     <button class="btn" onclick="limparFiltrosFin()">Limpar filtros</button>
     <div class="espaco"></div>
+    <button class="btn laranja" onclick="abrirGraficos()">📊 Gráficos</button>
     <button class="btn" onclick="exportarCsvFinanceiro()">Exportar CSV</button>
   </div>
   <div class="tabela-wrap">
@@ -951,6 +960,51 @@ tr.dragover td{background:#fff8f1}
     <div class="modal-rodape">
       <button class="btn" onclick="fechar('modalRecebimentos')">Fechar</button>
       <button class="btn principal" onclick="salvarRecebimento()">Lançar recebimento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalGraficos">
+  <div class="modal-cx cheio">
+    <div class="modal-topo"><h3>Gráficos do financeiro</h3><div class="espaco"></div>
+      <button class="btn" onclick="window.print()">Imprimir / PDF</button>
+      <button class="fechar" onclick="fechar('modalGraficos')">×</button></div>
+    <div class="modal-corpo" style="overflow:auto;display:block">
+      <div class="barra">
+        <div style="width:260px"><label>Filial</label>
+          <select id="gfFilial"><option value="">Todas as filiais</option></select></div>
+        <div style="width:140px"><label>Ano</label><select id="gfAno"></select></div>
+        <div style="width:200px"><label>Mostrar</label>
+          <select id="gfBase">
+            <option value="venc">Por mês de vencimento</option>
+            <option value="emissao">Por mês da transferência</option>
+          </select></div>
+      </div>
+      <div class="kpis" id="gfKpis"></div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-pad" style="border-bottom:1px solid var(--linha);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <h3 style="font-size:14px">A receber e recebido, mês a mês</h3>
+          <div class="espaco"></div>
+          <span class="leg"><i style="background:var(--verde)"></i>Recebido</span>
+          <span class="leg"><i style="background:var(--laranja)"></i>A vencer</span>
+          <span class="leg"><i style="background:var(--vermelho)"></i>Vencido</span>
+        </div>
+        <div class="card-pad"><div id="gfBarras"></div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <div class="card-pad" style="border-bottom:1px solid var(--linha)"><h3 style="font-size:14px">Em aberto por filial</h3></div>
+          <div class="card-pad"><div id="gfFiliais"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-pad" style="border-bottom:1px solid var(--linha)"><h3 style="font-size:14px">Resumo mês a mês</h3></div>
+          <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
+            <table><thead><tr><th>Mês</th><th class="num">Total</th><th class="num">Recebido</th>
+              <th class="num">Em aberto</th><th class="num">Vencido</th></tr></thead>
+              <tbody id="gfTabela"></tbody><tfoot id="gfTabelaTotal"></tfoot></table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -3497,6 +3551,140 @@ function cartaoCatalogo(p, destaque, cor, modoPreco){
 }
 
 renderCatalogo();
+</script>
+
+
+<script>
+/* ===================== GRÁFICOS DO FINANCEIRO ===================== */
+const COR_REC = '#0f7a45', COR_AVE = '#F18634', COR_VEN = '#c0392b';
+const MES_CURTO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+function abrirGraficos(){
+  const anos = new Set(S.financeiro.map(p=>iso(p.vencimento).slice(0,4)).filter(Boolean));
+  anos.add(String(new Date().getFullYear()));
+  const sel = $('gfAno').value;
+  $('gfAno').innerHTML = [...anos].sort().reverse().map(a=>`<option value="${a}">${a}</option>`).join('');
+  $('gfAno').value = sel || String(new Date().getFullYear());
+  const selF = $('gfFilial').value;
+  $('gfFilial').innerHTML = '<option value="">Todas as filiais</option>'+
+    S.filiais.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  $('gfFilial').value = selF;
+  renderGraficos(); abrir('modalGraficos');
+}
+['gfFilial','gfAno','gfBase'].forEach(id=>$(id).addEventListener('change', renderGraficos));
+
+function dadosGraficos(){
+  const fil = $('gfFilial').value, ano = $('gfAno').value, base = $('gfBase').value;
+  const meses = Array.from({length:12},()=>({total:0, recebido:0, aVencer:0, vencido:0}));
+  const porFilial = {};
+  let abertoGeral = 0, recebidoGeral = 0, vencidoGeral = 0, totalGeral = 0;
+
+  S.financeiro.forEach(p=>{
+    if(fil && String(p.filialId)!==fil) return;
+    const dataRef = iso(base==='emissao' ? p.data : p.vencimento);
+    if(!dataRef || dataRef.slice(0,4)!==ano) return;
+    const m = parseInt(dataRef.slice(5,7),10)-1;
+    if(m<0 || m>11) return;
+    const v = num(p.valor), st = situacao(p);
+    meses[m].total += v; totalGeral += v;
+    if(st==='PAGO'){ meses[m].recebido += v; recebidoGeral += v; }
+    else if(st==='VENCIDO'){ meses[m].vencido += v; vencidoGeral += v; abertoGeral += v; }
+    else { meses[m].aVencer += v; abertoGeral += v; }
+
+    if(st!=='PAGO'){
+      const k = p.filialNome || '—';
+      porFilial[k] = (porFilial[k]||0) + v;
+    }
+  });
+  return {meses, porFilial, abertoGeral, recebidoGeral, vencidoGeral, totalGeral};
+}
+
+function renderGraficos(){
+  const d = dadosGraficos();
+  const pct = d.totalGeral ? (d.recebidoGeral/d.totalGeral*100) : 0;
+  $('gfKpis').innerHTML = `
+    ${kpi('Total do período', moeda(d.totalGeral),'')}
+    ${kpi('Já recebido', moeda(d.recebidoGeral),'verde')}
+    ${kpi('Em aberto', moeda(d.abertoGeral),'laranja')}
+    ${kpi('Vencido', moeda(d.vencidoGeral),'vermelho')}
+    ${kpi('% recebido', pct.toFixed(1).replace('.',',')+'%','verde')}`;
+
+  desenharBarras(d.meses);
+  desenharFiliais(d.porFilial);
+
+  $('gfTabela').innerHTML = d.meses.map((m,i)=> m.total>0 ? `
+    <tr><td><b>${MESES[i]}</b></td>
+      <td class="num">${moeda(m.total)}</td>
+      <td class="num" style="color:var(--verde);font-weight:700">${moeda(m.recebido)}</td>
+      <td class="num" style="font-weight:700">${moeda(m.aVencer+m.vencido)}</td>
+      <td class="num" style="color:${m.vencido?'var(--vermelho)':'var(--cinza-claro)'};font-weight:700">${moeda(m.vencido)}</td></tr>`
+    : '').join('') || '<tr><td colspan="5"><div class="vazio">Nenhum lançamento no período.</div></td></tr>';
+  $('gfTabelaTotal').innerHTML = d.totalGeral ? `<tr style="background:#fafbfc">
+    <td style="font-weight:800;border-top:2px solid var(--linha)">TOTAL</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(d.totalGeral)}</td>
+    <td class="num" style="font-weight:800;color:var(--verde);border-top:2px solid var(--linha)">${moeda(d.recebidoGeral)}</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${moeda(d.abertoGeral)}</td>
+    <td class="num" style="font-weight:800;color:var(--vermelho);border-top:2px solid var(--linha)">${moeda(d.vencidoGeral)}</td></tr>` : '';
+}
+
+/* ---- barras empilhadas por mês ---- */
+function desenharBarras(meses){
+  const L=980, A=330, mE=74, mD=16, mT=18, mB=42;
+  const larg = L-mE-mD, alt = A-mT-mB;
+  const maxV = Math.max(...meses.map(m=>m.total), 1);
+  const esc0 = v => (v/maxV)*alt;
+  const passo = larg/12, bw = Math.min(54, passo*0.62);
+
+  const linhas = [];
+  for(let i=0;i<=4;i++){
+    const y = mT + alt - (alt/4)*i, v = maxV/4*i;
+    linhas.push(`<line x1="${mE}" y1="${y}" x2="${L-mD}" y2="${y}" stroke="#e9ebee" stroke-width="1"/>
+      <text x="${mE-8}" y="${y+3.5}" text-anchor="end" class="g-rot">${v>=1000?(Math.round(v/1000)+'k'):Math.round(v)}</text>`);
+  }
+
+  const barras = meses.map((m,i)=>{
+    const x = mE + passo*i + (passo-bw)/2;
+    let y = mT + alt, out = '';
+    const partes = [[m.recebido,COR_REC,'Recebido'],[m.aVencer,COR_AVE,'A vencer'],[m.vencido,COR_VEN,'Vencido']];
+    partes.forEach(([v,cor,rot])=>{
+      if(v<=0) return;
+      const h = Math.max(esc0(v), 1.5); y -= h;
+      out += `<rect class="g-barra" x="${x}" y="${y}" width="${bw}" height="${h}" fill="${cor}" rx="2">
+        <title>${MESES[i]} — ${rot}: ${moeda(v)}</title></rect>`;
+    });
+    const topo = mT + alt - esc0(m.total);
+    if(m.total>0) out += `<text x="${x+bw/2}" y="${topo-5}" text-anchor="middle" class="g-val">${
+      m.total>=1000?('R$ '+Math.round(m.total/1000)+'k'):moeda(m.total)}</text>`;
+    out += `<text x="${x+bw/2}" y="${A-mB+16}" text-anchor="middle" class="g-rot">${MES_CURTO[i]}</text>`;
+    return out;
+  }).join('');
+
+  $('gfBarras').innerHTML = `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="A receber e recebido por mês">
+    ${linhas.join('')}
+    <line x1="${mE}" y1="${mT+alt}" x2="${L-mD}" y2="${mT+alt}" stroke="#c9ccd1" stroke-width="1.5"/>
+    ${barras}</svg>`;
+}
+
+/* ---- barras horizontais: em aberto por filial ---- */
+function desenharFiliais(porFilial){
+  const itens = Object.keys(porFilial).map(k=>({nome:k, valor:porFilial[k]}))
+    .filter(x=>x.valor>0).sort((a,b)=>b.valor-a.valor).slice(0,16);
+  if(!itens.length){ $('gfFiliais').innerHTML = '<div class="vazio">Nada em aberto no período.</div>'; return; }
+
+  const L=560, linhaH=27, mE=168, mD=92, A=itens.length*linhaH+16;
+  const max = Math.max(...itens.map(x=>x.valor));
+  const larg = L-mE-mD;
+  const barras = itens.map((x,i)=>{
+    const y = i*linhaH+8, w = Math.max((x.valor/max)*larg, 2);
+    const nome = x.nome.length>26 ? x.nome.slice(0,25)+'…' : x.nome;
+    return `<text x="${mE-8}" y="${y+13}" text-anchor="end" class="g-rot" style="font-size:11px">${esc(nome)}
+        <title>${esc(x.nome)}</title></text>
+      <rect class="g-barra" x="${mE}" y="${y}" width="${w}" height="17" fill="${COR_AVE}" rx="3">
+        <title>${esc(x.nome)}: ${moeda(x.valor)}</title></rect>
+      <text x="${mE+w+7}" y="${y+13}" class="g-val">${moeda(x.valor)}</text>`;
+  }).join('');
+  $('gfFiliais').innerHTML = `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="Em aberto por filial">${barras}</svg>`;
+}
 </script>
 
 </body>
