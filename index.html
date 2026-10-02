@@ -128,7 +128,7 @@ tr.dragover td{background:#fff8f1}
 .rel-item .d td:last-child{text-align:right;font-weight:800}
 
 .lote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;
-  max-height:60vh;overflow:auto;padding:2px}
+  flex:1;min-height:0;overflow:auto;padding:2px;align-content:start}
 .lote-card{border:2px solid var(--linha);border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;position:relative}
 .lote-card:hover{border-color:var(--cinza-claro)}
 .lote-card.on{border-color:var(--laranja);box-shadow:0 0 0 3px rgba(241,134,52,.18)}
@@ -138,8 +138,20 @@ tr.dragover td{background:#fff8f1}
 .lote-card .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lote-card .badge{position:absolute;top:6px;right:6px;background:var(--verde);color:#fff;border-radius:99px;
   padding:1px 7px;font-size:10px;font-weight:900}
+.modal-cx.cheio{max-width:none;width:100vw;height:100vh;max-height:100vh;border-radius:0;
+  display:flex;flex-direction:column}
+.modal-cx.cheio .modal-corpo{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:14px 18px}
+.lote-colunas{flex:1;min-height:0;display:grid;grid-template-columns:.72fr 1.28fr;gap:16px}
+.lote-col{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.lote-resumo{border:1px solid var(--linha);border-radius:var(--raio);background:var(--branco);
+  box-shadow:var(--sombra);flex:0 0 auto;max-height:34vh;overflow:auto}
+.lote-resumo>summary{padding:11px 16px;font-weight:800;font-size:13.5px;cursor:pointer;
+  position:sticky;top:0;background:var(--branco);border-radius:var(--raio);z-index:2}
+.lote-resumo>div{padding:0 16px 14px}
+@media(max-width:1000px){.lote-colunas{grid-template-columns:1fr;overflow:auto}}
+
 .fil-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:6px;
-  padding:0 14px 14px;max-height:58vh;overflow:auto}
+  padding:0 14px 14px;flex:1;min-height:0;overflow:auto;align-content:start}
 .fil-item{display:flex;align-items:center;gap:8px;border:1px solid var(--linha);border-radius:8px;
   padding:6px 9px;background:#fff;min-height:46px}
 .fil-item.preenchida{border-color:var(--laranja);background:#fff8f2}
@@ -218,6 +230,7 @@ tr.dragover td{background:#fff8f1}
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;
   z-index:90;padding:20px;backdrop-filter:blur(2px)}
+#modalLote.aberto{padding:0}
 .modal.aberto{display:flex}
 .modal-cx{background:var(--branco);border-radius:14px;width:100%;max-width:720px;max-height:92vh;overflow:auto;
   box-shadow:0 24px 60px rgba(0,0,0,.3)}
@@ -831,28 +844,30 @@ tr.dragover td{background:#fff8f1}
 </div>
 
 <div class="modal" id="modalLote">
-  <div class="modal-cx" style="max-width:1240px">
+  <div class="modal-cx cheio">
     <div class="modal-topo"><h3>Transferências em lote — vários produtos para várias filiais</h3><div class="espaco"></div>
+      <span id="loteRascunhoInfo" style="font-size:11.5px;color:var(--cinza);font-weight:700"></span>
+      <button class="btn" onclick="salvarRascunhoLote()">💾 Salvar para continuar depois</button>
       <button class="btn" onclick="limparLote()">Limpar tudo</button>
       <button class="fechar" onclick="fechar('modalLote')">×</button></div>
     <div class="modal-corpo">
-      <div style="display:grid;grid-template-columns:.78fr 1.22fr;gap:18px;align-items:start">
-        <div>
-          <div class="barra" style="margin-bottom:12px">
+      <div class="lote-colunas">
+        <div class="lote-col">
+          <div class="barra" style="margin-bottom:10px">
             <div class="busca" style="max-width:none;flex:1">
               <input type="search" id="loteBusca" placeholder="Buscar produto com estoque…"></div>
           </div>
           <div id="loteProdutos" class="lote-grid"></div>
         </div>
-        <div class="card" style="position:sticky;top:0">
+        <div class="lote-col card">
           <div class="card-pad" id="loteCabecalho"></div>
           <div id="loteFiliais" class="fil-grid"></div>
         </div>
       </div>
-      <div class="card card-pad" style="margin-top:18px">
-        <h3 style="font-size:14px;margin-bottom:10px">Resumo do lote — tudo que será emitido</h3>
+      <details class="lote-resumo" open>
+        <summary>Resumo do lote — tudo que será emitido</summary>
         <div id="loteResumo"></div>
-      </div>
+      </details>
     </div>
     <div class="modal-rodape">
       <button class="btn" onclick="fechar('modalLote')">Fechar</button>
@@ -2191,15 +2206,89 @@ async function excluirTransferencia(id){
    Vários produtos -> várias filiais. A distribuição de cada produto
    fica guardada, e no fim sai UMA transferência por filial, com todos
    os produtos destinados a ela e financeiro próprio.                 */
-S.lote = { produtoId:'', dist:{}, pag:{} };
+S.lote = { produtoId:'', dist:{}, pag:{}, copia:null, copiaDe:'' };
 
 function abrirLote(){
   if(!S.filiais.length){ toast('Cadastre as filiais antes (engrenagem → Filiais).','erro'); return; }
+  if(!Object.keys(S.lote.dist).length) carregarRascunhoLote();
   renderLoteProdutos(); renderLotePainel(); abrir('modalLote');
+}
+
+/* ------- rascunho: fica salvo na planilha, acessível de qualquer PC ------- */
+const RASCUNHO_BLOCO = 45000;   // margem segura para o limite de caracteres da célula
+
+function rascunhoTexto(){
+  const partes = num(S.config.loteRascunhoPartes||0);
+  if(!partes) return '';
+  let txt = '';
+  for(let i=1;i<=partes;i++) txt += String(S.config['loteRascunho'+i]||'');
+  return txt;
+}
+function infoRascunho(){
+  const el = $('loteRascunhoInfo'); if(!el) return;
+  const data = S.config.loteRascunhoData;
+  el.textContent = data ? ('Rascunho salvo em '+dataBR(data)+(S.config.loteRascunhoHora?(' '+S.config.loteRascunhoHora):'')) : '';
+}
+async function salvarRascunhoLote(){
+  const prods = loteProdutosNaLista();
+  if(!prods.length){ toast('Nada distribuído para salvar.','erro'); return; }
+  const dados = JSON.stringify({dist:S.lote.dist, pag:S.lote.pag});
+  const antigas = num(S.config.loteRascunhoPartes||0);
+  const config = {};
+  let n = 0;
+  for(let i=0;i<dados.length;i+=RASCUNHO_BLOCO){ n++; config['loteRascunho'+n] = dados.slice(i,i+RASCUNHO_BLOCO); }
+  for(let i=n+1;i<=antigas;i++) config['loteRascunho'+i] = '';   // limpa sobras de um rascunho maior
+  const agora = new Date();
+  config.loteRascunhoPartes = n;
+  config.loteRascunhoData = hoje();
+  config.loteRascunhoHora = String(agora.getHours()).padStart(2,'0')+':'+String(agora.getMinutes()).padStart(2,'0');
+  try{
+    carregando(true,'Salvando rascunho…');
+    await api('salvarConfig',{config});
+    S.config = {...S.config, ...config}; S.versao='';
+    infoRascunho();
+    toast('Rascunho salvo. Você pode fechar e continuar depois, de qualquer computador.','ok');
+  }catch(e){ toast('Erro ao salvar rascunho: '+e.message,'erro'); } finally{ carregando(false); }
+}
+function carregarRascunhoLote(){
+  const txt = rascunhoTexto();
+  if(!txt) { infoRascunho(); return; }
+  let d;
+  try{ d = JSON.parse(txt); }catch(e){ infoRascunho(); return; }
+  if(!d || !d.dist || !Object.keys(d.dist).length){ infoRascunho(); return; }
+
+  // mantém só produtos e filiais que ainda existem, limitando ao estoque atual
+  const dist = {};
+  Object.keys(d.dist).forEach(pid=>{
+    const p = S.produtos.find(x=>x.id===pid); if(!p) return;
+    const linha = {}; let soma = 0;
+    Object.keys(d.dist[pid]).forEach(fid=>{
+      if(!S.filiais.some(f=>f.id===fid)) return;
+      let q = num(d.dist[pid][fid]);
+      if(soma + q > num(p.quantidade)) q = Math.max(0, num(p.quantidade)-soma);
+      if(q){ linha[fid] = q; soma += q; }
+    });
+    if(Object.keys(linha).length) dist[pid] = linha;
+  });
+  S.lote.dist = dist;
+  S.lote.pag = d.pag || {};
+  infoRascunho();
+  const n = Object.keys(dist).length;
+  if(n) toast('Rascunho recuperado: '+n+' produto(s). Use "Limpar tudo" para começar do zero.','ok');
+}
+async function apagarRascunhoLote(){
+  const partes = num(S.config.loteRascunhoPartes||0);
+  if(!partes) return;
+  const config = {loteRascunhoPartes:0, loteRascunhoData:'', loteRascunhoHora:''};
+  for(let i=1;i<=partes;i++) config['loteRascunho'+i] = '';
+  try{ await api('salvarConfig',{config}); S.config = {...S.config, ...config}; S.versao=''; infoRascunho(); }
+  catch(e){ /* rascunho vencido não impede o trabalho */ }
 }
 function limparLote(){
   if(Object.keys(S.lote.dist).length && !confirm('Limpar toda a distribuição já feita?')) return;
-  S.lote = {produtoId:'', dist:{}, pag:{}}; renderLoteProdutos(); renderLotePainel();
+  S.lote = {produtoId:'', dist:{}, pag:{}, copia:null, copiaDe:''};
+  apagarRascunhoLote();
+  renderLoteProdutos(); renderLotePainel();
 }
 
 /* ---- helpers ---- */
@@ -2280,7 +2369,66 @@ function renderLoteCabecalho(){
         <div style="font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--cinza)">A DISTRIBUIR</div>
         <div style="font-size:21px;font-weight:800;color:var(--laranja)">${inteiro(loteDistribuido(p.id))} un</div>
       </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn mini" onclick="copiarDistribuicao()" ${loteDistribuido(p.id)?'':'disabled'}>⧉ Copiar distribuição</button>
+      <button class="btn mini" onclick="colarDistribuicao()" ${S.lote.copia?'':'disabled'}>⇩ Colar distribuição</button>
+      <button class="btn mini perigo" onclick="zerarDistribuicao()" ${loteDistribuido(p.id)?'':'disabled'}>Zerar</button>
+      <span style="font-size:11.5px;color:var(--cinza);font-weight:700">${textoCopia()}</span>
     </div>`;
+}
+
+/* ---- copiar / colar a distribuição entre produtos ---- */
+function textoCopia(){
+  if(!S.lote.copia) return '';
+  const total = Object.values(S.lote.copia).reduce((a,v)=>a+num(v),0);
+  return 'Copiado de '+esc(S.lote.copiaDe)+': '+Object.keys(S.lote.copia).length+' filial(is), '+inteiro(total)+' un';
+}
+function copiarDistribuicao(){
+  const p = loteProduto(); if(!p) return;
+  const d = S.lote.dist[p.id];
+  if(!d || !Object.keys(d).length){ toast('Este produto não tem distribuição para copiar.','erro'); return; }
+  S.lote.copia = {...d}; S.lote.copiaDe = p.codigo;
+  renderLoteCabecalho();
+  toast('Distribuição de '+p.codigo+' copiada. Selecione outro produto e clique em Colar.','ok');
+}
+function colarDistribuicao(){
+  const p = loteProduto(); if(!p) return;
+  if(!S.lote.copia){ toast('Copie a distribuição de um produto primeiro.','erro'); return; }
+
+  const destino = {}; let pedido = 0;
+  Object.keys(S.lote.copia).forEach(fid=>{
+    if(!S.filiais.some(f=>f.id===fid)) return;          // filial excluída depois da cópia
+    destino[fid] = num(S.lote.copia[fid]); pedido += destino[fid];
+  });
+  if(!pedido){ toast('Nada para colar.','erro'); return; }
+
+  const estoque = num(p.quantidade);
+  let aviso = '';
+  if(pedido > estoque){                                  // ajusta proporcionalmente ao estoque
+    const fator = estoque/pedido;
+    let soma = 0;
+    Object.keys(destino).forEach(fid=>{ destino[fid] = Math.floor(destino[fid]*fator); soma += destino[fid]; });
+    let resto = estoque - soma;                          // devolve as sobras do arredondamento
+    Object.keys(destino).sort((a,b)=>destino[b]-destino[a]).forEach(fid=>{
+      if(resto>0){ destino[fid]++; resto--; }
+    });
+    Object.keys(destino).forEach(fid=>{ if(!destino[fid]) delete destino[fid]; });
+    aviso = ' (ajustado ao estoque de '+inteiro(estoque)+' un)';
+  }
+  if(loteDistribuido(p.id) &&
+     !confirm('Substituir a distribuição atual de '+p.codigo+' pela copiada de '+S.lote.copiaDe+'?')) return;
+
+  S.lote.dist[p.id] = destino;
+  if(!Object.keys(destino).length) delete S.lote.dist[p.id];
+  renderLotePainel(); renderLoteProdutos();
+  toast('Distribuição colada em '+p.codigo+aviso+'.','ok');
+}
+function zerarDistribuicao(){
+  const p = loteProduto(); if(!p) return;
+  if(!confirm('Zerar a distribuição de '+p.codigo+'?')) return;
+  delete S.lote.dist[p.id];
+  renderLotePainel(); renderLoteProdutos();
 }
 
 function renderLotePainel(){
@@ -2338,7 +2486,7 @@ function renderLoteResumo(){
       <div><span style="font-size:11px;font-weight:800;color:var(--cinza)">VALOR TOTAL</span>
         <div style="font-size:20px;font-weight:800">${moeda(loteTotalGeral())}</div></div>
     </div>
-    <div class="tabela-wrap" style="max-height:260px">
+    <div class="tabela-wrap" style="max-height:none">
       <table><thead><tr><th>Produto</th>
         ${fils.map(f=>`<th class="num">${esc(f.nome)}</th>`).join('')}
         <th class="num">Total</th><th class="num" style="width:50px"></th></tr></thead>
@@ -2450,7 +2598,8 @@ async function confirmarLote(){
       const r = await api('criarTransferencia', {transferencia, itens, parcelas: parcelasLote(total, S.lote.pag[f.id])});
       emitidas.push(r.transferencia.numero);
     }
-    S.versao=''; S.lote = {produtoId:'', dist:{}, pag:{}};
+    S.versao=''; S.lote = {produtoId:'', dist:{}, pag:{}, copia:null, copiaDe:''};
+    await apagarRascunhoLote();
     fechar('modalLotePagamento');
     await sincronizar(true);
     toast(emitidas.length+' transferência(s) emitida(s): nº '+emitidas.join(', '),'ok');
