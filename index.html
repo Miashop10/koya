@@ -694,6 +694,24 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
       </div>
       <div class="campo"><label>Prefixo dos códigos de barras internos (EAN-13)</label>
         <input type="text" id="cfgPrefixoEan" maxlength="7" placeholder="7890000"></div>
+      <h3 style="font-size:14px;margin:18px 0 10px">Dados fiscais — usados no XML de NFe para o Shop9</h3>
+      <div class="grid g3">
+        <div class="campo"><label>Inscrição estadual</label><input type="text" id="cdIe" placeholder="somente números"></div>
+        <div class="campo"><label>UF</label><input type="text" id="cdUf" maxlength="2" placeholder="PR"></div>
+        <div class="campo"><label>Cód. município (IBGE)</label><input type="text" id="cdMun" placeholder="4106902"></div>
+      </div>
+      <div class="grid g3">
+        <div class="campo"><label>Cidade</label><input type="text" id="cdMunNome" placeholder="CURITIBA"></div>
+        <div class="campo"><label>CEP</label><input type="text" id="cdCep" placeholder="80000000"></div>
+        <div class="campo"><label>CFOP de transferência</label><input type="text" id="cdCfop" placeholder="5152"></div>
+      </div>
+      <div class="grid g3">
+        <div class="campo"><label>Série da nota</label><input type="text" id="cdSerie" placeholder="1"></div>
+        <div class="campo"><label>NCM padrão (quando o produto não tiver)</label>
+          <input type="text" id="cdNcmPadrao" placeholder="00000000"></div>
+        <div class="campo"><label>Regime</label>
+          <select id="cdRegime"><option value="1">Simples Nacional</option><option value="3">Regime normal</option></select></div>
+      </div>
       <button class="btn principal" onclick="salvarConfig()">Salvar configurações</button>
     </div>
     <div class="card card-pad">
@@ -1066,6 +1084,11 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
       <div class="grid g2">
         <div class="campo"><label>Ou recalcular preço: custo ×</label><input type="number" id="mMultiplicador" step="0.1" placeholder="ex.: 2"></div>
         <div class="campo"><label>Fornecedor</label><input type="text" id="mFornecedor" placeholder="deixar como está"></div>
+      </div>
+      <div class="grid g2">
+        <div class="campo"><label>NCM (8 dígitos — usado no XML da NFe)</label>
+          <input type="text" id="mNcm" maxlength="8" placeholder="deixar como está"></div>
+        <div class="campo"></div>
       </div>
       <div class="grid g2">
         <div class="campo"><label>Quantidade em estoque</label><input type="number" id="mQtd" step="1" placeholder="deixar como está"></div>
@@ -1648,7 +1671,7 @@ function atualizarBarraMassa(){
 }
 function abrirEdicaoMassa(){
   if(!S.selProdutos.length){ toast('Selecione ao menos um produto.','erro'); return; }
-  ['mSetor','mUnidade','mCusto','mPreco','mPrecoLoja','mMultLoja','mMultiplicador','mFornecedor','mQtd','mObs',
+  ['mSetor','mUnidade','mCusto','mPreco','mPrecoLoja','mMultLoja','mMultiplicador','mFornecedor','mNcm','mQtd','mObs',
    'mRecData','mRecContainer','mRecQtd','mRecObs'].forEach(i=>$(i).value='');
   $('mRecSomar').checked = false;
   $('massaQtd').textContent = S.selProdutos.length+' produto(s) serão alterados.';
@@ -1657,7 +1680,7 @@ function abrirEdicaoMassa(){
 }
 async function salvarEdicaoMassa(){
   const campos = {};
-  const texto = {mSetor:'setor', mUnidade:'unidade', mFornecedor:'fornecedor', mObs:'obs'};
+  const texto = {mSetor:'setor', mUnidade:'unidade', mFornecedor:'fornecedor', mObs:'obs', mNcm:'ncm'};
   Object.keys(texto).forEach(k=>{ const v=$(k).value.trim(); if(v) campos[texto[k]] = v; });
   const numeros = {mCusto:'custoChina', mPreco:'precoVenda', mPrecoLoja:'precoLoja', mQtd:'quantidade'};
   Object.keys(numeros).forEach(k=>{ const v=$(k).value.trim(); if(v!=='') campos[numeros[k]] = num(v); });
@@ -1942,38 +1965,157 @@ function baixarArquivo(nome, conteudo, tipo){
   const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = nome;
   a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
 }
+/* ---------- XML no layout da NFe 4.00, para importar no Shop9 ---------- */
+function soNum(v, tam){ const x = String(v||'').replace(/\D/g,''); return tam ? x.slice(0,tam) : x; }
+function padEsq(v, n){ return String(v||'').replace(/\D/g,'').padStart(n,'0').slice(-n); }
+function dv11(base){                       // dígito verificador da chave de acesso
+  const pesos = [2,3,4,5,6,7,8,9];
+  let soma = 0, j = 0;
+  for(let i = base.length-1; i >= 0; i--, j++) soma += parseInt(base[i],10) * pesos[j%8];
+  const r = soma % 11;
+  return (r===0 || r===1) ? '0' : String(11-r);
+}
+const UF_CODIGO = {AC:'12',AL:'27',AP:'16',AM:'13',BA:'29',CE:'23',DF:'53',ES:'32',GO:'52',MA:'21',
+  MT:'51',MS:'50',MG:'31',PA:'15',PB:'25',PR:'41',PE:'26',PI:'22',RJ:'33',RN:'24',RS:'43',RO:'11',
+  RR:'14',SC:'42',SP:'35',SE:'28',TO:'17'};
+function xmlEsc(v){ return String(v==null?'':v)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function dec(v, casas){ return num(v).toFixed(casas||2); }
+
 function exportarXmlTransferencia(id){
   const t = S.transferencias.find(x=>x.id===id); if(!t) return;
   const itens = S.itens.filter(i=>String(i.transferenciaId)===String(t.id));
   if(!itens.length){ toast('Transferência sem itens.','erro'); return; }
-  const x = ['<?xml version="1.0" encoding="UTF-8"?>',
-    '<transferencia numero="'+esc(t.numero)+'" data="'+iso(t.data)+'" origem="MIASHOP CD China">',
-    '  <destino>',
-    '    <filial>'+esc(t.filialNome)+'</filial>',
-    '    <cnpj>'+esc(t.filialCnpj||'')+'</cnpj>',
-    '  </destino>',
-    '  <produtos>'];
-  itens.forEach(i=>{
-    const p = S.produtos.find(y=>String(y.id)===String(i.produtoId)) || {};
-    x.push('    <produto>');
-    x.push('      <codigo>'+esc(i.codigo)+'</codigo>');
-    x.push('      <descricao>'+esc(i.descricao)+'</descricao>');
-    x.push('      <codigobarras>'+esc(i.codigoBarras||'')+'</codigobarras>');
-    x.push('      <unidade>'+esc(p.unidade||'UN')+'</unidade>');
-    x.push('      <ncm>'+esc(p.ncm||'')+'</ncm>');
-    x.push('      <quantidade>'+num(i.quantidade)+'</quantidade>');
-    x.push('      <custo>'+num(p.custoChina).toFixed(2)+'</custo>');
-    x.push('      <preco>'+num(i.precoUnit).toFixed(2)+'</preco>');
-    x.push('      <precovendaloja>'+(num(i.precoLoja)||num(p.precoLoja)).toFixed(2)+'</precovendaloja>');
-    x.push('      <total>'+num(i.total).toFixed(2)+'</total>');
-    x.push('    </produto>');
+
+  const c = S.config || {};
+  const uf = (c.cdUf || 'PR').toUpperCase();
+  const cUF = UF_CODIGO[uf] || '41';
+  const cnpjEmit = soNum(c.cdCnpj, 14);
+  if(cnpjEmit.length !== 14){
+    toast('Informe o CNPJ do Centro de Distribuição em Configurações antes de exportar.','erro'); return;
+  }
+  const serie = String(parseInt(c.cdSerie||'1',10) || 1);
+  const nNF   = String(parseInt(t.numero,10) || 1);
+  const data  = iso(t.data) || hoje();
+  const aamm  = data.slice(2,4) + data.slice(5,7);
+  const cNF   = padEsq(String(Math.abs(hashTexto(t.id)) % 100000000), 8);
+  const base43 = cUF + aamm + cnpjEmit + '55' + padEsq(serie,3) + padEsq(nNF,9) + '1' + cNF;
+  const cDV   = dv11(base43);
+  const chave = base43 + cDV;
+
+  const cfop   = soNum(c.cdCfop,4) || '5152';
+  const ncmPad = soNum(c.cdNcmPadrao,8) || '00000000';
+  const regime = String(c.cdRegime || '1');
+  const munCod = soNum(c.cdMun,7) || '4106902';
+  const munNome= c.cdMunNome || 'CURITIBA';
+  const cep    = soNum(c.cdCep,8) || '00000000';
+  const dhEmi  = data + 'T' + new Date().toTimeString().slice(0,8) + '-03:00';
+
+  const L = [];
+  L.push('<?xml version="1.0" encoding="UTF-8"?>');
+  L.push('<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">');
+  L.push('<NFe xmlns="http://www.portalfiscal.inf.br/nfe">');
+  L.push('<infNFe versao="4.00" Id="NFe'+chave+'">');
+
+  L.push('<ide>');
+  L.push('<cUF>'+cUF+'</cUF><cNF>'+cNF+'</cNF>');
+  L.push('<natOp>TRANSFERENCIA DE MERCADORIA</natOp>');
+  L.push('<mod>55</mod><serie>'+serie+'</serie><nNF>'+nNF+'</nNF>');
+  L.push('<dhEmi>'+dhEmi+'</dhEmi><dhSaiEnt>'+dhEmi+'</dhSaiEnt>');
+  L.push('<tpNF>1</tpNF><idDest>1</idDest><cMunFG>'+munCod+'</cMunFG>');
+  L.push('<tpImp>1</tpImp><tpEmis>1</tpEmis><cDV>'+cDV+'</cDV><tpAmb>2</tpAmb>');
+  L.push('<finNFe>1</finNFe><indFinal>0</indFinal><indPres>9</indPres>');
+  L.push('<procEmi>0</procEmi><verProc>MIASHOP-CD-1.0</verProc>');
+  L.push('</ide>');
+
+  L.push('<emit>');
+  L.push('<CNPJ>'+cnpjEmit+'</CNPJ>');
+  L.push('<xNome>'+xmlEsc(c.cdNome || 'MIASHOP CENTRO DE DISTRIBUICAO')+'</xNome>');
+  L.push('<enderEmit><xLgr>'+xmlEsc(c.cdEndereco || 'NAO INFORMADO')+'</xLgr><nro>S/N</nro>'+
+         '<xBairro>CENTRO</xBairro><cMun>'+munCod+'</cMun><xMun>'+xmlEsc(munNome)+'</xMun>'+
+         '<UF>'+uf+'</UF><CEP>'+cep+'</CEP><cPais>1058</cPais><xPais>BRASIL</xPais></enderEmit>');
+  L.push('<IE>'+(soNum(c.cdIe) || 'ISENTO')+'</IE>');
+  L.push('<CRT>'+regime+'</CRT>');
+  L.push('</emit>');
+
+  const cnpjDest = soNum(t.filialCnpj, 14);
+  L.push('<dest>');
+  L.push(cnpjDest.length===14 ? '<CNPJ>'+cnpjDest+'</CNPJ>' : '<CNPJ>'+cnpjEmit+'</CNPJ>');
+  L.push('<xNome>'+xmlEsc(t.filialNome || 'FILIAL')+'</xNome>');
+  L.push('<enderDest><xLgr>NAO INFORMADO</xLgr><nro>S/N</nro><xBairro>CENTRO</xBairro>'+
+         '<cMun>'+munCod+'</cMun><xMun>'+xmlEsc(munNome)+'</xMun><UF>'+uf+'</UF>'+
+         '<CEP>'+cep+'</CEP><cPais>1058</cPais><xPais>BRASIL</xPais></enderDest>');
+  L.push('<indIEDest>9</indIEDest>');
+  L.push('</dest>');
+
+  let vProdTot = 0;
+  itens.forEach((it, ix)=>{
+    const pr = S.produtos.find(x=>String(x.id)===String(it.produtoId)) || {};
+    const ean = soNum(it.codigoBarras || pr.codigoBarras);
+    const gtin = (ean.length===8 || ean.length===12 || ean.length===13 || ean.length===14) ? ean : 'SEM GTIN';
+    const ncm = soNum(pr.ncm,8).padStart(8,'0') !== '00000000' ? soNum(pr.ncm,8) : ncmPad;
+    const q = num(it.quantidade), vu = num(it.precoUnit), vp = Math.round(q*vu*100)/100;
+    vProdTot += vp;
+
+    L.push('<det nItem="'+(ix+1)+'">');
+    L.push('<prod>');
+    L.push('<cProd>'+xmlEsc(it.codigo)+'</cProd>');
+    L.push('<cEAN>'+gtin+'</cEAN>');
+    L.push('<xProd>'+xmlEsc(String(it.descricao||'').slice(0,120))+'</xProd>');
+    L.push('<NCM>'+ncm+'</NCM>');
+    L.push('<CFOP>'+cfop+'</CFOP>');
+    L.push('<uCom>'+xmlEsc(pr.unidade || 'UN')+'</uCom>');
+    L.push('<qCom>'+dec(q,4)+'</qCom>');
+    L.push('<vUnCom>'+dec(vu,10)+'</vUnCom>');
+    L.push('<vProd>'+dec(vp,2)+'</vProd>');
+    L.push('<cEANTrib>'+gtin+'</cEANTrib>');
+    L.push('<uTrib>'+xmlEsc(pr.unidade || 'UN')+'</uTrib>');
+    L.push('<qTrib>'+dec(q,4)+'</qTrib>');
+    L.push('<vUnTrib>'+dec(vu,10)+'</vUnTrib>');
+    L.push('<indTot>1</indTot>');
+    L.push('</prod>');
+    L.push('<imposto>');
+    L.push(regime === '1'
+      ? '<ICMS><ICMSSN102><orig>1</orig><CSOSN>400</CSOSN></ICMSSN102></ICMS>'
+      : '<ICMS><ICMS41><orig>1</orig><CST>41</CST></ICMS41></ICMS>');
+    L.push('<PIS><PISNT><CST>07</CST></PISNT></PIS>');
+    L.push('<COFINS><COFINSNT><CST>07</CST></COFINSNT></COFINS>');
+    L.push('</imposto>');
+    L.push('</det>');
   });
-  x.push('  </produtos>');
-  x.push('  <totais><itens>'+num(t.qtdItens)+'</itens><valor>'+num(t.valorTotal).toFixed(2)+'</valor></totais>');
-  x.push('</transferencia>');
-  baixarArquivo('miashop-transf-'+t.numero+'-shop9.xml', x.join('\n'), 'application/xml');
-  toast('XML da transferência '+t.numero+' gerado.','ok');
+
+  const vNF = dec(vProdTot,2);
+  L.push('<total><ICMSTot>'+
+    '<vBC>0.00</vBC><vICMS>0.00</vICMS><vICMSDeson>0.00</vICMSDeson><vFCP>0.00</vFCP>'+
+    '<vBCST>0.00</vBCST><vST>0.00</vST><vFCPST>0.00</vFCPST><vFCPSTRet>0.00</vFCPSTRet>'+
+    '<vProd>'+vNF+'</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>0.00</vDesc>'+
+    '<vII>0.00</vII><vIPI>0.00</vIPI><vIPIDevol>0.00</vIPIDevol><vPIS>0.00</vPIS>'+
+    '<vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>'+vNF+'</vNF>'+
+    '</ICMSTot></total>');
+  L.push('<transp><modFrete>9</modFrete></transp>');
+  L.push('<pag><detPag><indPag>0</indPag><tPag>90</tPag><vPag>'+vNF+'</vPag></detPag></pag>');
+  L.push('<infAdic><infCpl>'+xmlEsc('Transferencia '+t.numero+' do Centro de Distribuicao para a filial '+
+         (t.filialNome||'')+'. Documento de uso interno, sem valor fiscal.')+'</infCpl></infAdic>');
+
+  L.push('</infNFe>');
+  L.push('</NFe>');
+  L.push('<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>MIASHOP</verAplic>'+
+         '<chNFe>'+chave+'</chNFe><dhRecbto>'+dhEmi+'</dhRecbto>'+
+         '<nProt>'+padEsq(String(Math.abs(hashTexto(chave)) % 1000000000000000), 15)+'</nProt>'+
+         '<digVal>MIASHOP</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo>'+
+         '</infProt></protNFe>');
+  L.push('</nfeProc>');
+
+  baixarArquivo('NFe-transf-'+t.numero+'-'+chave+'.xml', L.join('\n'), 'application/xml');
+  toast('XML de NFe gerado (transferência '+t.numero+').','ok');
 }
+
+function hashTexto(txt){
+  let h = 0;
+  for(let i=0;i<String(txt).length;i++){ h = (h*31 + String(txt).charCodeAt(i)) | 0; }
+  return h;
+}
+
 function csv(linhas){ return '\uFEFF'+linhas.map(l=>l.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n'); }
 function exportarCsvProdutos(){
   const l = [['CODIGO','DESCRICAO','QTDE ESTOQUE','QTDE VENDIDA','TOTAL RECEBIDO','ULTIMO RECEBIMENTO','CUSTO CHINA','VALOR TOTAL CUSTO','PRECO VENDA MIASHOP','VALOR TOTAL VENDA MIASHOP','PRECO VENDA LOJA','VALOR TOTAL VENDA LOJA','CODIGO DE BARRAS','UNIDADE','NCM']];
@@ -3072,6 +3214,11 @@ function renderConfig(){
   $('cdCnpj').value = c.cdCnpj || ''; $('cdEndereco').value = c.cdEndereco || '';
   $('cdCidade').value = c.cdCidade || ''; $('cdTelefone').value = c.cdTelefone || '';
   $('cfgPrefixoEan').value = c.prefixoEan || '7890000';
+  $('cdIe').value = c.cdIe || ''; $('cdUf').value = c.cdUf || 'PR';
+  $('cdMun').value = c.cdMun || '4106902'; $('cdMunNome').value = c.cdMunNome || 'CURITIBA';
+  $('cdCep').value = c.cdCep || ''; $('cdCfop').value = c.cdCfop || '5152';
+  $('cdSerie').value = c.cdSerie || '1'; $('cdNcmPadrao').value = c.cdNcmPadrao || '00000000';
+  $('cdRegime').value = c.cdRegime || '1';
   $('cfgUrl').value = CONFIG.API_URL;
   $('linksNuvem').innerHTML =
     (S.urlPlanilha?`<a class="btn" href="${S.urlPlanilha}" target="_blank">Abrir planilha (banco de dados)</a>`:'')+
@@ -3080,7 +3227,12 @@ function renderConfig(){
 async function salvarConfig(){
   const config = { cdNome:$('cdNome').value.trim(), cdCnpj:$('cdCnpj').value.trim(),
     cdEndereco:$('cdEndereco').value.trim(), cdCidade:$('cdCidade').value.trim(),
-    cdTelefone:$('cdTelefone').value.trim(), prefixoEan:$('cfgPrefixoEan').value.trim() };
+    cdTelefone:$('cdTelefone').value.trim(), prefixoEan:$('cfgPrefixoEan').value.trim(),
+    cdIe:$('cdIe').value.trim(), cdUf:$('cdUf').value.trim().toUpperCase(),
+    cdMun:$('cdMun').value.trim(), cdMunNome:$('cdMunNome').value.trim(),
+    cdCep:$('cdCep').value.trim(), cdCfop:$('cdCfop').value.trim(),
+    cdSerie:$('cdSerie').value.trim(), cdNcmPadrao:$('cdNcmPadrao').value.trim(),
+    cdRegime:$('cdRegime').value };
   try{ carregando(true,'Salvando…'); await api('salvarConfig',{config});
     S.config = {...S.config, ...config}; toast('Configurações salvas.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
