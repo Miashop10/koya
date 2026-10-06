@@ -176,6 +176,11 @@ tr.dragover td{background:#fff8f1}
 .lote-card .badge-dist{background:var(--laranja);color:#fff;border-radius:99px;
   padding:1px 8px;font-size:10.5px;font-weight:900}
 
+#tabelaTransf{font-size:12.5px}
+#tabelaTransf th{padding:9px 8px;font-size:10px}
+#tabelaTransf td{padding:7px 8px}
+#tabelaTransf .btn.mini{padding:4px 8px;font-size:11px}
+
 th.ord{cursor:pointer;user-select:none;white-space:nowrap}
 th.ord:hover{color:var(--preto)}
 th.ord::after{content:' ↕';opacity:.35;font-size:10px}
@@ -468,15 +473,34 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
     </div>
     <div class="card card-pad">
       <h3 style="margin-bottom:12px">Transferências emitidas</h3>
-      <input type="search" id="buscaTransfLista" placeholder="Buscar por número ou filial…" style="margin-bottom:10px">
-      <div class="barra" style="margin-bottom:10px;gap:8px">
+      <div class="barra" style="margin-bottom:8px;gap:8px">
+        <div class="busca" style="flex:1;max-width:none">
+          <input type="search" id="buscaTransfLista" placeholder="Buscar por número ou filial…"></div>
+        <div style="width:200px"><select id="fTransfFilial"><option value="">Todas as filiais</option></select></div>
+      </div>
+      <div class="barra" style="margin-bottom:8px;gap:8px">
+        <div style="width:150px"><input type="date" id="fTransfDe" title="Emitidas de"></div>
+        <div style="width:150px"><input type="date" id="fTransfAte" title="Emitidas até"></div>
+        <button class="btn mini" onclick="periodoTransf(0)">Hoje</button>
+        <button class="btn mini" onclick="periodoTransf(7)">7 dias</button>
+        <button class="btn mini" onclick="periodoTransf(30)">30 dias</button>
+        <button class="btn mini" onclick="limparFiltrosTransf()">Limpar</button>
+      </div>
+      <div class="barra" style="margin-bottom:8px;gap:8px">
         <button class="btn mini" onclick="marcarTransfTodas(true)">Selecionar todas</button>
-        <button class="btn mini" onclick="marcarTransfTodas(false)">Limpar</button>
+        <button class="btn mini" onclick="marcarTransfTodas(false)">Limpar seleção</button>
         <div class="espaco"></div>
         <b id="transfSelResumo" style="font-size:12px;color:var(--cinza)"></b>
         <button class="btn laranja mini" onclick="imprimirSelecionadas()">🖨 Imprimir selecionadas</button>
       </div>
-      <div id="listaTransferencias" style="max-height:640px;overflow:auto"></div>
+      <div class="tabela-wrap" style="max-height:62vh">
+        <table id="tabelaTransf"><thead><tr>
+          <th style="width:30px"><input type="checkbox" id="chkTransfTodas" style="width:auto"
+            onclick="marcarTransfTodas(this.checked)"></th>
+          <th>Nº</th><th>Data</th><th>Filial</th><th class="num">Peças</th><th class="num">Valor</th>
+          <th>Pagamento</th><th class="num" style="width:150px">Ações</th>
+        </tr></thead><tbody id="listaTransferencias"></tbody><tfoot id="totalTransf"></tfoot></table>
+      </div>
     </div>
   </div>
 </section>
@@ -2420,31 +2444,68 @@ async function confirmarTransferencia(){
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 
-function renderTransferencias(){
+function transferenciasFiltradas(){
   const q = ($('buscaTransfLista').value||'').trim().toLowerCase();
-  const lista = [...S.transferencias].sort((a,b)=> String(b.numero).localeCompare(String(a.numero)))
-    .filter(t => !q || [t.numero,t.filialNome].some(v=>String(v||'').toLowerCase().includes(q)));
+  const fil = $('fTransfFilial').value;
+  const de = $('fTransfDe').value, ate = $('fTransfAte').value;
+  return [...S.transferencias]
+    .filter(t=>{
+      if(q && ![t.numero,t.filialNome].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+      if(fil && String(t.filialId)!==fil) return false;
+      const d = iso(t.data);
+      if(de && d < de) return false;
+      if(ate && d > ate) return false;
+      return true;
+    })
+    .sort((a,b)=> String(b.numero).localeCompare(String(a.numero)));
+}
+
+function renderTransferencias(){
+  const ops = S.filiais.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  const selF = $('fTransfFilial').value;
+  $('fTransfFilial').innerHTML = '<option value="">Todas as filiais</option>'+ops;
+  $('fTransfFilial').value = selF;
+
+  const lista = transferenciasFiltradas();
   $('listaTransferencias').innerHTML = lista.length ? lista.map(t=>`
-    <div style="border:1px solid var(--linha);border-radius:9px;padding:12px;margin-bottom:9px">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <input type="checkbox" class="selTransf" value="${t.id}" style="width:auto;margin-top:3px"
-            ${S.selTransf.includes(t.id)?'checked':''} onclick="alternarTransf('${t.id}')">
-        <div>
-          <div style="font-weight:800">Nº ${esc(t.numero)} • ${esc(t.filialNome)}</div>
-          <small style="color:var(--cinza)">${dataBR(t.data)} • ${inteiro(t.qtdItens)} peças • ${esc(t.formaPagamento||'')} ${num(t.qtdParcelas)>1?('em '+num(t.qtdParcelas)+'x'):''}</small>
-        </div></div>
-        <div style="text-align:right"><b>${moeda(t.valorTotal)}</b></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn mini" onclick="verRecibo('${t.id}')">Ver recibo</button>
-        <button class="btn mini" onclick="exportarXmlTransferencia('${t.id}')">XML p/ Shop9</button>
-        <button class="btn mini perigo" onclick="excluirTransferencia('${t.id}')">Cancelar</button>
-      </div>
-    </div>`).join('')
-    : '<div class="vazio">Nenhuma transferência emitida.</div>';
+    <tr>
+      <td><input type="checkbox" class="selTransf" value="${t.id}" style="width:auto"
+        ${S.selTransf.includes(t.id)?'checked':''} onclick="alternarTransf('${t.id}')"></td>
+      <td class="mono"><b>${esc(t.numero)}</b></td>
+      <td>${dataBR(t.data)}</td>
+      <td>${esc(t.filialNome)}</td>
+      <td class="num">${inteiro(t.qtdItens)}</td>
+      <td class="num"><b>${moeda(t.valorTotal)}</b></td>
+      <td style="font-size:11.5px">${esc(t.formaPagamento||'')}${num(t.qtdParcelas)>1?(' • '+num(t.qtdParcelas)+'x'):''}</td>
+      <td class="num">
+        <button class="btn mini" onclick="verRecibo('${t.id}')" title="Ver recibo">Recibo</button>
+        <button class="btn mini" onclick="exportarXmlTransferencia('${t.id}')" title="Gerar XML de NFe">XML</button>
+        <button class="btn mini perigo" onclick="excluirTransferencia('${t.id}')" title="Cancelar">×</button>
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="8"><div class="vazio">Nenhuma transferência no período.</div></td></tr>';
+
+  $('totalTransf').innerHTML = lista.length ? `<tr style="background:#fafbfc">
+    <td colspan="4" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">
+      ${inteiro(lista.length)} transferência(s)</td>
+    <td class="num" style="font-weight:800;border-top:2px solid var(--linha)">${inteiro(lista.reduce((a,t)=>a+num(t.qtdItens),0))}</td>
+    <td class="num" style="font-weight:800;font-size:14px;border-top:2px solid var(--linha)">${moeda(lista.reduce((a,t)=>a+num(t.valorTotal),0))}</td>
+    <td colspan="2" style="border-top:2px solid var(--linha)"></td></tr>` : '';
+
   atualizarResumoTransf();
 }
+
+function periodoTransf(dias){
+  $('fTransfAte').value = hoje();
+  $('fTransfDe').value = dias ? somarDias(hoje(), -dias) : hoje();
+  renderTransferencias();
+}
+function limparFiltrosTransf(){
+  ['buscaTransfLista','fTransfFilial','fTransfDe','fTransfAte'].forEach(i=>$(i).value='');
+  renderTransferencias();
+}
+['fTransfFilial','fTransfDe','fTransfAte'].forEach(id=>$(id).addEventListener('change', renderTransferencias));
+
 $('buscaTransfLista').addEventListener('input', renderTransferencias);
 
 async function excluirTransferencia(id){
@@ -2896,17 +2957,16 @@ function alternarTransf(id){
   atualizarResumoTransf();
 }
 function marcarTransfTodas(marcar){
-  const q = ($('buscaTransfLista').value||'').trim().toLowerCase();
-  const ids = S.transferencias
-    .filter(t=> !q || [t.numero,t.filialNome].some(v=>String(v||'').toLowerCase().includes(q)))
-    .map(t=>t.id);
-  S.selTransf = marcar ? ids : [];
+  S.selTransf = marcar ? transferenciasFiltradas().map(t=>t.id) : [];
   renderTransferencias();
 }
 function atualizarResumoTransf(){
   const n = S.selTransf.length;
   $('transfSelResumo').textContent = n ? (n+' selecionada(s)') : '';
   document.querySelectorAll('.selTransf').forEach(c=> c.checked = S.selTransf.includes(c.value));
+  const vis = transferenciasFiltradas().map(t=>t.id);
+  const chk = $('chkTransfTodas');
+  if(chk) chk.checked = vis.length>0 && vis.every(id=>S.selTransf.includes(id));
 }
 function imprimirSelecionadas(){
   if(!S.selTransf.length){ toast('Selecione as transferências que deseja imprimir.','erro'); return; }
