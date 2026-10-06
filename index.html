@@ -3058,17 +3058,24 @@ function tagSituacao(s){
   const cls = s==='PAGO'?'ok' : s==='VENCIDO'?'venc' : s==='VENCE HOJE'?'hoje':'aberto';
   return `<span class="tag ${cls}">${s}</span>`;
 }
-function financeiroFiltrado(){
-  const st=$('fFinStatus').value, fi=$('fFinFilial').value, de=$('fFinDe').value, ate=$('fFinAte').value;
+/* filtra por filial e período de vencimento — base dos resumos do topo */
+function financeiroBase(){
+  const fi=$('fFinFilial').value, de=$('fFinDe').value, ate=$('fFinAte').value;
   return S.financeiro.filter(p=>{
-    const s = situacao(p);
-    if(st==='ABERTO' && !(s==='ABERTO'||s==='VENCE HOJE')) return false;
-    if(st==='VENCIDO' && s!=='VENCIDO') return false;
-    if(st==='PAGO' && s!=='PAGO') return false;
     if(fi && String(p.filialId)!==fi) return false;
     const v = iso(p.vencimento);
     if(de && v < de) return false;
     if(ate && v > ate) return false;
+    return true;
+  });
+}
+function financeiroFiltrado(){
+  const st=$('fFinStatus').value;
+  return financeiroBase().filter(p=>{
+    const s = situacao(p);
+    if(st==='ABERTO' && !(s==='ABERTO'||s==='VENCE HOJE')) return false;
+    if(st==='VENCIDO' && s!=='VENCIDO') return false;
+    if(st==='PAGO' && s!=='PAGO') return false;
     return true;
   }).sort((a,b)=> iso(a.vencimento).localeCompare(iso(b.vencimento)));
 }
@@ -3095,18 +3102,19 @@ function renderFinanceiro(){
 
   $('totalFinanceiro').textContent = moeda(lista.reduce((a,p)=>a+num(p.valor),0));
 
-  const abertos = S.financeiro.filter(p=>situacao(p)!=='PAGO');
-  const vencidos = abertos.filter(p=>situacao(p)==='VENCIDO');
-  const prox = abertos.filter(p=>{ const v=iso(p.vencimento); return v>=hoje() && v<=somarDias(hoje(),7); });
-  const mes = hoje().slice(0,7);
-  const recebidoMes = S.financeiro.filter(p=>situacao(p)==='PAGO' && mesDe(p.dataPagamento||p.vencimento)===mes);
+  // os resumos seguem os filtros de filial e período (o filtro de situação não os altera)
+  const base = financeiroBase();
+  const abertos  = base.filter(p=>situacao(p)!=='PAGO');
+  const vencidos = base.filter(p=>situacao(p)==='VENCIDO');
+  const recebido = base.filter(p=>situacao(p)==='PAGO');
   const soma = arr => arr.reduce((a,p)=>a+num(p.valor),0);
+  const temFiltro = $('fFinFilial').value || $('fFinDe').value || $('fFinAte').value;
+  const suf = temFiltro ? ' • filtrado' : '';
   $('kpisFinanceiro').innerHTML = `
-    ${kpi('Total em aberto', moeda(soma(abertos)),'laranja')}
-    ${kpi('Vencidos ('+vencidos.length+')', moeda(soma(vencidos)),'vermelho')}
-    ${kpi('Vencem em 7 dias ('+prox.length+')', moeda(soma(prox)),'amarelo')}
-    ${kpi('Recebido no mês', moeda(soma(recebidoMes)),'verde')}
-    ${kpi('Total faturado', moeda(soma(S.financeiro)),'')}`;
+    ${kpi('Total em aberto'+suf, moeda(soma(abertos)),'laranja')}
+    ${kpi('Vencidos ('+vencidos.length+')'+suf, moeda(soma(vencidos)),'vermelho')}
+    ${kpi('Recebido'+suf, moeda(soma(recebido)),'verde')}
+    ${kpi('Total faturado'+suf, moeda(soma(base)),'')}`;
 }
 ['fFinStatus','fFinFilial','fFinDe','fFinAte'].forEach(id=>$(id).addEventListener('change', renderFinanceiro));
 function limparFiltrosFin(){ ['fFinStatus','fFinFilial','fFinDe','fFinAte'].forEach(id=>$(id).value=''); renderFinanceiro(); }
