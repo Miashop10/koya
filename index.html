@@ -174,6 +174,25 @@ tr.dragover td{background:#fff8f1}
 
 .recibo-pag + .recibo-pag{margin-top:18px;padding-top:18px}
 
+/* mapa de separação */
+.mapa-folha{background:#fff;padding:12mm 10mm;margin:0 auto 16px;box-shadow:0 6px 24px rgba(0,0,0,.14);
+  max-width:1400px;color:#111}
+.mapa-topo{display:flex;align-items:center;gap:14px;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}
+.mapa-topo img{height:40px}
+.mapa-topo .tit{margin-left:auto;text-align:right;font-size:11px;color:#555}
+.mapa-topo .tit b{display:block;font-size:14px;color:#111}
+table.mapa{width:100%;border-collapse:collapse;font-size:12px}
+table.mapa th,table.mapa td{border:1px solid #b9bcc1;padding:5px 6px;text-align:center}
+table.mapa thead th{background:#f1f2f4;font-size:10.5px;line-height:1.2;position:static;
+  text-transform:none;letter-spacing:0;color:#111}
+table.mapa td.cod{text-align:left;font-family:monospace;font-weight:800;white-space:nowrap}
+table.mapa td.desc{text-align:left;font-size:10.5px;color:#444}
+table.mapa td.zero{color:#c9ccd1}
+table.mapa td.qtd{font-weight:700}
+table.mapa tfoot td{background:#f1f2f4;font-weight:800}
+table.mapa tbody tr:nth-child(even) td{background:#fafbfc}
+table.mapa .tot{background:#fff4e9;font-weight:800}
+
 .lote-card.usado{border-color:var(--laranja)}
 .lote-card .badge-dist{background:var(--laranja);color:#fff;border-radius:99px;
   padding:1px 8px;font-size:10.5px;font-weight:900}
@@ -260,7 +279,7 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;
   z-index:90;padding:20px;backdrop-filter:blur(2px)}
-#modalLote.aberto,#modalGraficos.aberto{padding:0}
+#modalLote.aberto,#modalGraficos.aberto,#modalMapa.aberto{padding:0}
 .modal.aberto{display:flex}
 .modal-cx{background:var(--branco);border-radius:14px;width:100%;max-width:720px;max-height:92vh;overflow:auto;
   box-shadow:0 24px 60px rgba(0,0,0,.3)}
@@ -506,6 +525,7 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
         <div class="espaco"></div>
         <b id="transfSelResumo" style="font-size:12px;color:var(--cinza)"></b>
         <button class="btn laranja mini" onclick="imprimirSelecionadas()">🖨 Imprimir selecionadas</button>
+        <button class="btn mini" onclick="mapaDistribuicao()" title="Grade de códigos × filiais para a separação">⊞ Mapa de separação</button>
       </div>
       <div class="tabela-wrap" style="max-height:62vh">
         <table id="tabelaTransf"><thead><tr>
@@ -1038,6 +1058,18 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
     <div class="modal-rodape">
       <button class="btn" onclick="fechar('modalRecebimentos')">Fechar</button>
       <button class="btn principal" onclick="salvarRecebimento()">Lançar recebimento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalMapa">
+  <div class="modal-cx cheio">
+    <div class="modal-topo"><h3>Mapa de separação — códigos por filial</h3><div class="espaco"></div>
+      <button class="btn" onclick="exportarCsvMapa()">CSV</button>
+      <button class="btn laranja" onclick="window.print()">Imprimir / PDF</button>
+      <button class="fechar" onclick="fecharMapa()">×</button></div>
+    <div class="modal-corpo" style="overflow:auto;display:block;background:#eceef1">
+      <div id="mapaArea"></div>
     </div>
   </div>
 </div>
@@ -4222,6 +4254,104 @@ async function salvarEdicaoTransferencia(){
     await sincronizar(true);
     toast('Transferência '+t0.numero+' atualizada.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+</script>
+
+
+<script>
+/* ============ MAPA DE SEPARAÇÃO (códigos × filiais) =============== */
+function dadosMapa(){
+  const sel = S.transferencias.filter(t=>S.selTransf.includes(t.id));
+  const filiais = [];
+  sel.forEach(t=>{
+    const k = String(t.filialId||t.filialNome);
+    if(!filiais.some(f=>f.chave===k)) filiais.push({chave:k, nome:t.filialNome||'—'});
+  });
+  filiais.sort((a,b)=> String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+
+  const linhas = {};
+  sel.forEach(t=>{
+    const k = String(t.filialId||t.filialNome);
+    S.itens.filter(i=>String(i.transferenciaId)===String(t.id)).forEach(i=>{
+      const cod = String(i.codigo||'').trim() || String(i.produtoId);
+      linhas[cod] = linhas[cod] || {codigo:cod, descricao:i.descricao||'', qtds:{}, total:0};
+      linhas[cod].qtds[k] = num(linhas[cod].qtds[k]) + num(i.quantidade);
+      linhas[cod].total += num(i.quantidade);
+    });
+  });
+  const lista = Object.values(linhas).sort((a,b)=>
+    String(a.codigo).localeCompare(String(b.codigo),'pt-BR',{numeric:true}));
+  return {filiais, lista, transf:sel};
+}
+
+function mapaDistribuicao(){
+  if(!S.selTransf.length){ toast('Selecione as transferências que entram no mapa.','erro'); return; }
+  const d = dadosMapa();
+  if(!d.lista.length){ toast('As transferências selecionadas não têm itens.','erro'); return; }
+
+  const totFilial = {}; d.filiais.forEach(f=> totFilial[f.chave] =
+    d.lista.reduce((a,l)=>a+num(l.qtds[f.chave]), 0));
+  const totGeral = d.lista.reduce((a,l)=>a+l.total,0);
+  const docs = d.transf.map(t=>t.numero).sort().join(', ');
+
+  $('mapaArea').innerHTML = `<div class="mapa-folha">
+    <div class="mapa-topo">
+      <img src="${LOGO}" alt="MIASHOP">
+      <div class="tit"><b>Mapa de separação — Centro de Distribuição</b>
+        ${d.lista.length} código(s) • ${d.filiais.length} filial(is) • ${inteiro(totGeral)} peças<br>
+        Transferências nº ${esc(docs)} • emitido em ${dataBR(hoje())}</div>
+    </div>
+    <table class="mapa">
+      <thead><tr>
+        <th style="width:80px">CÓDIGO</th>
+        <th style="text-align:left">DESCRIÇÃO</th>
+        ${d.filiais.map(f=>`<th>${esc(f.nome)}</th>`).join('')}
+        <th class="tot">TOTAL</th>
+      </tr></thead>
+      <tbody>
+        ${d.lista.map(l=>`<tr>
+          <td class="cod">${esc(l.codigo)}</td>
+          <td class="desc">${esc(l.descricao)}</td>
+          ${d.filiais.map(f=>{ const q = num(l.qtds[f.chave]);
+            return q ? `<td class="qtd">${inteiro(q)}</td>` : '<td class="zero">—</td>'; }).join('')}
+          <td class="tot">${inteiro(l.total)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="2" style="text-align:right">TOTAL POR FILIAL</td>
+        ${d.filiais.map(f=>`<td>${inteiro(totFilial[f.chave])}</td>`).join('')}
+        <td class="tot">${inteiro(totGeral)}</td>
+      </tr></tfoot>
+    </table>
+  </div>`;
+
+  // muitas filiais: imprime deitado
+  const est = document.createElement('style');
+  est.id = 'estiloMapaPagina';
+  est.textContent = '@media print{@page{size:A4 '+(d.filiais.length>5?'landscape':'portrait')+';margin:8mm}'+
+    '.mapa-folha{box-shadow:none;padding:0;margin:0;max-width:none}'+
+    'table.mapa{font-size:'+(d.filiais.length>8?'8.5pt':'10pt')+'}'+
+    'table.mapa thead{display:table-header-group}'+
+    'table.mapa tr{page-break-inside:avoid}'+
+    'table.mapa th,table.mapa td{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  document.getElementById('estiloMapaPagina')?.remove();
+  document.head.appendChild(est);
+
+  abrir('modalMapa');
+  toast('Mapa gerado: '+d.lista.length+' código(s) em '+d.filiais.length+' filial(is).','ok');
+}
+function fecharMapa(){
+  document.getElementById('estiloMapaPagina')?.remove();
+  fechar('modalMapa');
+}
+function exportarCsvMapa(){
+  const d = dadosMapa();
+  const l = [['CODIGO','DESCRICAO', ...d.filiais.map(f=>f.nome), 'TOTAL']];
+  d.lista.forEach(x=> l.push([x.codigo, x.descricao,
+    ...d.filiais.map(f=> num(x.qtds[f.chave])||0), x.total]));
+  l.push(['TOTAL','', ...d.filiais.map(f=> d.lista.reduce((a,x)=>a+num(x.qtds[f.chave]),0)),
+    d.lista.reduce((a,x)=>a+x.total,0)]);
+  baixarArquivo('mapa-separacao-'+hoje()+'.csv', csv(l), 'text/csv;charset=utf-8');
 }
 </script>
 
