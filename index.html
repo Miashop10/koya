@@ -1409,7 +1409,7 @@ const CONFIG = {
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            usuarios:[], recebimentos:[], selTransf:[], selFin:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            usuarios:[], recebimentos:[], exclusoes:[], selTransf:[], selFin:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
             urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
@@ -1471,7 +1471,7 @@ async function sincronizar(silencioso){
     S.transferencias = d.transferencias||[]; S.itens = d.itens||[];
     S.financeiro = d.financeiro||[]; S.config = d.config||{};
     S.emprestimos = d.emprestimos||[]; S.pagamentosBanco = d.pagamentosBanco||[];
-    S.usuarios = d.usuarios||[]; S.recebimentos = d.recebimentos||[];
+    S.usuarios = d.usuarios||[]; S.recebimentos = d.recebimentos||[]; S.exclusoes = d.exclusoes||[];
     S.urlPlanilha = d.urlPlanilha||''; S.urlPasta = d.urlPasta||'';
     statusConexao(true);
     renderTudo();
@@ -2703,7 +2703,7 @@ $('buscaTransfLista').addEventListener('input', renderTransferencias);
 async function excluirTransferencia(id){
   const t = S.transferencias.find(x=>x.id===id);
   if(!confirm('Cancelar a transferência Nº '+t.numero+'? O estoque volta para o CD e o financeiro é excluído.')) return;
-  try{ carregando(true,'Cancelando…'); await api('excluirTransferencia',{id, devolverEstoque:true});
+  try{ carregando(true,'Cancelando…'); await api('excluirTransferencia',{id, devolverEstoque:true, usuario:CONFIG.USUARIO||'master'});
     await sincronizar(true); toast('Transferência cancelada.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
@@ -4559,7 +4559,7 @@ async function excluirSelecionadasTransf(){
   if(!confirm(aviso)) return;
   try{
     carregando(true,'Excluindo '+sel.length+' transferência(s)…');
-    await api('excluirTransferenciasLote', {ids:S.selTransf, devolverEstoque:true});
+    await api('excluirTransferenciasLote', {ids:S.selTransf, devolverEstoque:true, usuario:CONFIG.USUARIO||'master'});
     S.versao=''; S.selTransf=[];
     await sincronizar(true);
     toast(sel.length+' transferência(s) excluída(s).','ok');
@@ -4647,15 +4647,16 @@ function renderDiagnostico(){
   const dup = Object.keys(d.duplicados).reduce((a,k)=>a+d.duplicados[k].length,0);
   const orf = d.itensOrfaos.length + d.parcelasOrfas.length;
   const div = d.totaisDivergentes.length;
-  const est = d.estoqueDivergente.length;
-  const tudoOk = !dup && !orf && !div && !est && !d.transferenciasSemItens.length;
+  const est = (d.estoqueDivergente||[]).length;
+  const devDup = (d.devolucoesDuplicadas||[]).length;
+  const tudoOk = !dup && !orf && !div && !devDup && !d.transferenciasSemItens.length;
 
   $('diagResumo').innerHTML = `
     <div class="kpis">
       ${kpi('Lançamentos repetidos', inteiro(dup), dup?'vermelho':'verde')}
       ${kpi('Itens/parcelas sem transferência', inteiro(orf), orf?'vermelho':'verde')}
       ${kpi('Totais fora de sincronia', inteiro(div), div?'laranja':'verde')}
-      ${kpi('Produtos com estoque divergente', inteiro(est), est?'laranja':'verde')}
+      ${kpi('Devoluções em duplicidade', inteiro(devDup), devDup?'vermelho':'verde')}
     </div>
     ${tudoOk ? '<div class="card card-pad" style="border-left:4px solid var(--verde)"><b>Nenhum problema encontrado.</b> A base está consistente.</div>'
       : `<div class="card card-pad" style="border-left:4px solid var(--laranja);margin-bottom:16px">
@@ -4712,13 +4713,59 @@ function renderDiagnostico(){
         <td class="num"><button class="btn mini perigo" onclick="excluirTransferenciaDiag('${t.id}','${esc(t.numero)}')">Excluir</button></td></tr>`).join('')}
     </tbody></table>`);
 
+  const dev = d.devolucoes || [];
+  if(dev.length){
+    html += `<div class="card" style="margin-bottom:16px">
+      <div class="card-pad" style="border-bottom:1px solid var(--linha);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <h3 style="font-size:14px">Devoluções por cancelamento de transferência</h3>
+        <span style="font-size:12px;color:var(--cinza)">o que voltou ao estoque do CD, registro a registro</span>
+      </div>
+      <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
+        <table><thead><tr><th>Quando</th><th>Nº</th><th>Filial</th><th>Código</th><th>Descrição</th>
+          <th class="num">Devolvido</th><th class="num">Estoque antes</th><th class="num">Depois</th>
+          <th class="num">Hoje</th><th>Situação</th><th class="num" style="width:120px"></th></tr></thead><tbody>
+          ${dev.map(x=>{
+            const dobrada = x.vezes>1;
+            return `<tr style="${dobrada?'background:#fdecea':''}">
+              <td>${dataBR(x.data)}<br><small style="color:var(--cinza)">${esc(x.hora)}</small></td>
+              <td class="mono">${esc(x.numero)}</td>
+              <td>${esc(x.filial)}</td>
+              <td class="mono"><b>${esc(x.codigo)}</b></td>
+              <td>${esc(x.descricao)}</td>
+              <td class="num"><b>${inteiro(x.devolvido)}</b>${dobrada?`<br><small style="color:var(--vermelho)">${x.vezes}× ${inteiro(x.quantidade)}</small>`:''}</td>
+              <td class="num">${inteiro(x.estoqueAntes)}</td>
+              <td class="num">${inteiro(x.estoqueDepois)}</td>
+              <td class="num">${x.estoqueHoje===null?'—':inteiro(x.estoqueHoje)}</td>
+              <td>${dobrada ? '<span class="tag venc">EM DOBRO</span>' : '<span class="tag ok">OK</span>'}</td>
+              <td class="num">${dobrada?`<button class="btn mini perigo"
+                onclick="corrigirDevolucao('${x.produtoId}',${x.quantidade*(x.vezes-1)},'${esc(x.codigo)}')">
+                Tirar ${inteiro(x.quantidade*(x.vezes-1))}</button>`:''}</td>
+            </tr>`;}).join('')}
+        </tbody></table>
+      </div>
+      <div class="card-pad" style="color:var(--cinza);font-size:12px;line-height:1.6">
+        <b>Como conferir:</b> em cada linha, <i>Estoque antes</i> + <i>Devolvido</i> deve dar <i>Depois</i>.
+        Se a mesma transferência e o mesmo produto aparecerem mais de uma vez, o estoque voltou em dobro —
+        use o botão da linha para descontar o excesso.
+        Este registro começa a partir desta versão: cancelamentos feitos antes não constam aqui.
+      </div>
+    </div>`;
+  } else {
+    html += `<div class="card card-pad" style="margin-bottom:16px">
+      <b>Nenhuma devolução registrada ainda.</b>
+      <p style="color:var(--cinza);font-size:12.5px;margin:8px 0 0;line-height:1.6">
+        A partir desta versão, todo cancelamento de transferência passa a gravar o que voltou ao estoque
+        — com a quantidade, o estoque antes e depois — para conferência aqui.
+      </p>
+    </div>`;
+  }
+
   if(d.estoqueDivergente.length) html += `
     <div class="card" style="margin-bottom:16px">
       <div class="card-pad" style="border-bottom:1px solid var(--linha);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <h3 style="font-size:14px">Estoque divergente</h3>
-        <span style="font-size:12px;color:var(--cinza)">esperado = total recebido − total transferido</span>
+        <h3 style="font-size:14px">Comparação com os recebimentos <span style="font-weight:600;color:var(--cinza)">(apenas indicativa)</span></h3>
         <div class="espaco"></div>
-        <button class="btn laranja" onclick="aplicarEstoqueEsperado()">Aplicar o estoque esperado a todos</button>
+        <button class="btn" onclick="aplicarEstoqueEsperado()">Aplicar o esperado aos listados</button>
       </div>
       <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
         <table><thead><tr><th>Código</th><th>Descrição</th><th class="num">Recebido</th>
@@ -4733,8 +4780,11 @@ function renderDiagnostico(){
         </tbody></table>
       </div>
       <div class="card-pad" style="color:var(--cinza);font-size:12px;line-height:1.6">
-        Diferença positiva costuma indicar estoque devolvido mais de uma vez (exclusão repetida);
-        negativa, recebimento ainda não lançado. Só aparecem aqui os produtos que têm recebimento registrado.
+        <b>Leia antes de aplicar.</b> Esta conta é <i>total recebido − total transferido</i> e só vale para produtos
+        cuja entrada inteira está registrada em Recebimentos. Produtos que vieram da importação do Excel
+        (com a quantidade já no cadastro) e depois tiveram o recebimento lançado <i>somando</i> ao estoque
+        aparecem aqui com uma diferença do tamanho do container — e nesse caso o certo é o estoque atual,
+        não o esperado. Para conferir um cancelamento, use a tabela de devoluções acima.
       </div>
     </div>`;
 
@@ -4764,6 +4814,21 @@ async function aplicarEstoqueEsperado(){
     await sincronizar(true);
     await rodarDiagnostico();
     toast(n+' produto(s) ajustado(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+/* desconta do estoque o que voltou em dobro numa devolução */
+async function corrigirDevolucao(produtoId, excesso, codigo){
+  const p = S.produtos.find(x=>String(x.id)===String(produtoId));
+  if(!p){ toast('Produto não encontrado.','erro'); return; }
+  const novo = Math.max(0, num(p.quantidade) - num(excesso));
+  if(!confirm('Descontar '+inteiro(excesso)+' un do produto '+codigo+'?\n\n'+
+    'Estoque atual: '+inteiro(p.quantidade)+'\nFicará com: '+inteiro(novo))) return;
+  try{
+    carregando(true,'Ajustando o estoque…');
+    await api('ajustarEstoqueLote', {itens:[{id:p.id, quantidade:novo}]});
+    S.versao=''; await sincronizar(true); await rodarDiagnostico();
+    toast('Estoque de '+codigo+' ajustado para '+inteiro(novo)+' un.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 
