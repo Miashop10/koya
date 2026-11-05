@@ -526,6 +526,8 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
         <b id="transfSelResumo" style="font-size:12px;color:var(--cinza)"></b>
         <button class="btn laranja mini" onclick="imprimirSelecionadas()">🖨 Imprimir selecionadas</button>
         <button class="btn mini" onclick="mapaDistribuicao()" title="Grade de códigos × filiais para a separação">⊞ Mapa de separação</button>
+        <button class="btn mini" onclick="abrirEdicaoLoteTransf()" title="Alterar data, filial ou pagamento das selecionadas">✎ Editar selecionadas</button>
+        <button class="btn mini perigo" onclick="excluirSelecionadasTransf()" title="Cancelar as selecionadas">🗑 Excluir selecionadas</button>
       </div>
       <div class="tabela-wrap" style="max-height:62vh">
         <table id="tabelaTransf"><thead><tr>
@@ -554,13 +556,23 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
     <button class="btn laranja" onclick="abrirGraficos()">📊 Gráficos</button>
     <button class="btn" onclick="exportarCsvFinanceiro()">Exportar CSV</button>
   </div>
+  <div id="barraFin" class="barra" style="display:none;background:#fff7ef;border:1px solid var(--laranja);
+       border-radius:10px;padding:10px 12px;margin-bottom:12px">
+    <b id="finSelResumo"></b>
+    <button class="btn laranja" onclick="abrirBaixaLote()">✓ Dar baixa nas selecionadas</button>
+    <button class="btn" onclick="reabrirSelecionadas()">Reabrir selecionadas</button>
+    <div class="espaco"></div>
+    <button class="btn mini" onclick="marcarFinTodas(false)">Limpar seleção</button>
+  </div>
   <div class="tabela-wrap">
     <table><thead><tr>
+      <th style="width:30px"><input type="checkbox" id="chkFinTodas" style="width:auto"
+        onclick="marcarFinTodas(this.checked)" title="Selecionar todos os listados"></th>
       <th>Documento</th><th>Data</th><th>Filial</th><th>Parcela</th><th>Forma de pagamento</th>
       <th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th class="num" style="width:150px">Ações</th>
     </tr></thead><tbody id="tbFinanceiro"></tbody>
     <tfoot><tr style="position:sticky;bottom:0;background:#fafbfc">
-      <td colspan="6" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL DOS BOLETOS LISTADOS</td>
+      <td colspan="7" style="text-align:right;font-weight:800;border-top:2px solid var(--linha)">TOTAL DOS BOLETOS LISTADOS</td>
       <td class="num" id="totalFinanceiro" style="font-weight:800;font-size:15px;border-top:2px solid var(--linha)">R$ 0,00</td>
       <td colspan="2" style="border-top:2px solid var(--linha)"></td>
     </tr></tfoot></table>
@@ -786,7 +798,12 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
       <h3 style="margin-bottom:10px;font-size:14px">Backup local</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" onclick="exportarBackup()">Baixar backup (JSON)</button>
+        <button class="btn laranja" onclick="abrirDiagnostico()">🔎 Verificar a base</button>
       </div>
+      <p style="color:var(--cinza);font-size:12px;margin:10px 0 0;line-height:1.6">
+        A verificação procura lançamentos repetidos, itens e parcelas sem transferência
+        e totais fora de sincronia — e corrige o que encontrar.
+      </p>
     </div>
   </div>
 
@@ -1062,6 +1079,82 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
   </div>
 </div>
 
+<div class="modal" id="modalDiagnostico">
+  <div class="modal-cx cheio">
+    <div class="modal-topo"><h3>Verificação da base de dados</h3><div class="espaco"></div>
+      <button class="btn" onclick="rodarDiagnostico()">↻ Verificar de novo</button>
+      <button class="fechar" onclick="fechar('modalDiagnostico')">×</button></div>
+    <div class="modal-corpo" style="overflow:auto;display:block">
+      <div id="diagResumo"></div>
+      <div id="diagDetalhes"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalEditLoteTransf">
+  <div class="modal-cx" style="max-width:640px">
+    <div class="modal-topo"><h3>Editar transferências selecionadas</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalEditLoteTransf')">×</button></div>
+    <div class="modal-corpo">
+      <div id="resumoEditLote" style="background:#f6f7f8;border-radius:9px;padding:12px 14px;margin-bottom:16px;
+           font-size:13px;line-height:1.6"></div>
+      <p style="color:var(--cinza);font-size:12.5px;margin:0 0 14px">
+        Preencha só o que quiser alterar — os campos em branco ficam como estão.
+        Os itens de cada transferência não são alterados aqui.
+      </p>
+      <div class="grid g2">
+        <div class="campo"><label>Nova data da transferência</label><input type="date" id="elData"></div>
+        <div class="campo"><label>Nova filial de destino</label>
+          <select id="elFilial"><option value="">manter como está</option></select></div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--linha);margin:18px 0">
+      <label style="text-transform:none;letter-spacing:0;font-size:13px;display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <input type="checkbox" id="elRefazerPag" style="width:auto">
+        <b>Refazer as condições de pagamento</b>
+      </label>
+      <div id="elBlocoPag" style="opacity:.45;pointer-events:none">
+        <div class="grid g4">
+          <div class="campo"><label>Forma</label>
+            <select id="elForma"><option>Boleto</option><option>PIX</option><option>Transferência bancária</option>
+              <option>Cartão de crédito</option><option>Dinheiro</option><option>Débito em conta</option></select></div>
+          <div class="campo"><label>Parcelas</label><input type="number" id="elParcelas" min="1" max="48" value="1"></div>
+          <div class="campo"><label>1º vencimento</label><input type="date" id="elPrimeiro"></div>
+          <div class="campo"><label>Intervalo (dias)</label><input type="number" id="elIntervalo" min="1" value="30"></div>
+        </div>
+        <div style="background:#fff7ef;border-left:4px solid var(--laranja);padding:10px 12px;border-radius:0 8px 8px 0;font-size:12.5px">
+          As parcelas de cada transferência serão recriadas sobre o próprio valor dela, e
+          <b>todas voltarão para EM ABERTO</b> — inclusive as que já estiverem baixadas.
+        </div>
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalEditLoteTransf')">Cancelar</button>
+      <button class="btn laranja" onclick="salvarEdicaoLoteTransf()">Aplicar às selecionadas</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalBaixaLote">
+  <div class="modal-cx" style="max-width:520px">
+    <div class="modal-topo"><h3>Dar baixa nas parcelas selecionadas</h3><div class="espaco"></div>
+      <button class="fechar" onclick="fechar('modalBaixaLote')">×</button></div>
+    <div class="modal-corpo">
+      <div id="resumoBaixaLote" style="background:#f6f7f8;border-radius:9px;padding:12px 14px;margin-bottom:16px;
+           font-size:13px;line-height:1.6"></div>
+      <div class="campo"><label>Data do pagamento</label><input type="date" id="dataBaixaLote"></div>
+      <label style="text-transform:none;letter-spacing:0;font-size:12.5px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" id="baixaUsarVencimento" style="width:auto">
+        Usar a data de vencimento de cada parcela como data do pagamento
+      </label>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn" onclick="fechar('modalBaixaLote')">Cancelar</button>
+      <button class="btn laranja" onclick="confirmarBaixaLote()">Confirmar baixa</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modalMapa">
   <div class="modal-cx cheio">
     <div class="modal-topo"><h3>Mapa de separação — códigos por filial</h3><div class="espaco"></div>
@@ -1316,7 +1409,7 @@ const CONFIG = {
 /* ======================== ESTADO E UTILITÁRIOS ======================== */
 const S = { produtos:[], filiais:[], transferencias:[], itens:[], financeiro:[], config:{},
             emprestimos:[], pagamentosBanco:[],
-            usuarios:[], recebimentos:[], selTransf:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
+            usuarios:[], recebimentos:[], selTransf:[], selFin:[], carrinho:[], parcelas:[], importar:[], selProdutos:[], versao:'',
             urlPlanilha:'', urlPasta:'', online:false };
 
 const $  = id => document.getElementById(id);
@@ -3185,6 +3278,8 @@ function renderFinanceiro(){
   $('tbFinanceiro').innerHTML = lista.length ? lista.map(p=>{
     const s = situacao(p);
     return `<tr>
+      <td><input type="checkbox" class="selFin" value="${p.id}" style="width:auto"
+        ${S.selFin.includes(p.id)?'checked':''} onclick="alternarFin('${p.id}')"></td>
       <td class="mono"><b>${esc(p.numeroDoc)}</b></td>
       <td>${dataBR(p.data)}</td>
       <td>${esc(p.filialNome)}</td>
@@ -3199,9 +3294,10 @@ function renderFinanceiro(){
         <button class="btn mini" onclick="verRecibo('${p.transferenciaId}')">Recibo</button>
       </td></tr>`;
   }).join('')
-  : '<tr><td colspan="9"><div class="vazio"><b>Nenhum lançamento</b>O financeiro é gerado automaticamente a cada transferência.</div></td></tr>';
+  : '<tr><td colspan="10"><div class="vazio"><b>Nenhum lançamento</b>O financeiro é gerado automaticamente a cada transferência.</div></td></tr>';
 
   $('totalFinanceiro').textContent = moeda(lista.reduce((a,p)=>a+num(p.valor),0));
+  atualizarBarraFin();
 
   // os resumos seguem os filtros de filial e período (o filtro de situação não os altera)
   const base = financeiroBase();
@@ -3220,19 +3316,106 @@ function renderFinanceiro(){
 ['fFinStatus','fFinFilial','fFinDe','fFinAte'].forEach(id=>$(id).addEventListener('change', renderFinanceiro));
 function limparFiltrosFin(){ ['fFinStatus','fFinFilial','fFinDe','fFinAte'].forEach(id=>$(id).value=''); renderFinanceiro(); }
 
+/* ------------- seleção e baixa de várias parcelas ---------------- */
+function alternarFin(id){
+  const i = S.selFin.indexOf(id);
+  if(i>=0) S.selFin.splice(i,1); else S.selFin.push(id);
+  atualizarBarraFin();
+}
+function marcarFinTodas(marcar){
+  S.selFin = marcar ? financeiroFiltrado().map(p=>p.id) : [];
+  renderFinanceiro();
+}
+function parcelasSelecionadas(){
+  return S.financeiro.filter(p=>S.selFin.includes(p.id));
+}
+function atualizarBarraFin(){
+  const sel = parcelasSelecionadas();
+  $('barraFin').style.display = sel.length ? 'flex' : 'none';
+  const total = sel.reduce((a,p)=>a+num(p.valor),0);
+  const emAberto = sel.filter(p=>situacao(p)!=='PAGO').length;
+  $('finSelResumo').innerHTML = sel.length +
+    ' parcela(s) • <span style="color:var(--laranja)">'+moeda(total)+'</span>'+
+    (emAberto!==sel.length ? ` • ${sel.length-emAberto} já paga(s)` : '');
+  const vis = financeiroFiltrado().map(p=>p.id);
+  const chk = $('chkFinTodas');
+  if(chk) chk.checked = vis.length>0 && vis.every(id=>S.selFin.includes(id));
+  document.querySelectorAll('.selFin').forEach(c=> c.checked = S.selFin.includes(c.value));
+}
+
+function abrirBaixaLote(){
+  const sel = parcelasSelecionadas();
+  if(!sel.length){ toast('Selecione as parcelas.','erro'); return; }
+  const aPagar = sel.filter(p=>situacao(p)!=='PAGO');
+  if(!aPagar.length){ toast('Todas as parcelas selecionadas já estão baixadas.','erro'); return; }
+  const total = aPagar.reduce((a,p)=>a+num(p.valor),0);
+  const filiais = [...new Set(aPagar.map(p=>p.filialNome))];
+  $('resumoBaixaLote').innerHTML =
+    `<b>${aPagar.length} parcela(s)</b> serão marcadas como pagas<br>
+     Valor total: <b>${moeda(total)}</b><br>
+     Filial(is): ${esc(filiais.slice(0,4).join(', '))}${filiais.length>4?' e mais '+(filiais.length-4):''}
+     ${sel.length>aPagar.length?`<br><span style="color:var(--cinza)">${sel.length-aPagar.length} já estava(m) paga(s) e não será(ão) alterada(s).</span>`:''}`;
+  $('dataBaixaLote').value = hoje();
+  $('baixaUsarVencimento').checked = false;
+  abrir('modalBaixaLote');
+}
+
+async function confirmarBaixaLote(){
+  const aPagar = parcelasSelecionadas().filter(p=>situacao(p)!=='PAGO');
+  if(!aPagar.length){ fechar('modalBaixaLote'); return; }
+  const usarVenc = $('baixaUsarVencimento').checked;
+  const data = iso($('dataBaixaLote').value) || hoje();
+  try{
+    carregando(true,'Baixando '+aPagar.length+' parcela(s)…');
+    if(usarVenc){
+      // agrupa por data de vencimento: uma chamada por data, não uma por parcela
+      const grupos = {};
+      aPagar.forEach(p=>{ const d = iso(p.vencimento) || data; (grupos[d] = grupos[d] || []).push(p.id); });
+      for(const d of Object.keys(grupos)){
+        await api('atualizarParcelasLote', {ids:grupos[d], status:'PAGO', dataPagamento:d});
+        grupos[d].forEach(id=>{ const p = S.financeiro.find(x=>x.id===id);
+          if(p){ p.status='PAGO'; p.dataPagamento=d; } });
+      }
+    } else {
+      await api('atualizarParcelasLote', {ids:aPagar.map(p=>p.id), status:'PAGO', dataPagamento:data});
+      aPagar.forEach(p=>{ p.status='PAGO'; p.dataPagamento=data; });
+    }
+    S.versao=''; S.selFin=[];
+    fechar('modalBaixaLote');
+    renderFinanceiro(); renderRelatorios();
+    toast(aPagar.length+' parcela(s) baixada(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+async function reabrirSelecionadas(){
+  const pagas = parcelasSelecionadas().filter(p=>situacao(p)==='PAGO');
+  if(!pagas.length){ toast('Nenhuma parcela paga entre as selecionadas.','erro'); return; }
+  if(!confirm('Reabrir '+pagas.length+' parcela(s)? Elas voltam a constar como em aberto.')) return;
+  try{
+    carregando(true,'Reabrindo '+pagas.length+' parcela(s)…');
+    await api('atualizarParcelasLote', {ids:pagas.map(p=>p.id), status:'ABERTO', dataPagamento:''});
+    pagas.forEach(p=>{ p.status='ABERTO'; p.dataPagamento=''; });
+    S.versao=''; S.selFin=[];
+    renderFinanceiro(); renderRelatorios();
+    toast(pagas.length+' parcela(s) reaberta(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
 async function baixarParcela(id){
   const p = S.financeiro.find(x=>x.id===id);
   const data = prompt('Data do pagamento (AAAA-MM-DD):', hoje()); if(!data) return;
   try{ carregando(true,'Baixando parcela…');
     await api('atualizarParcela',{id, status:'PAGO', dataPagamento:iso(data)});
-    p.status='PAGO'; p.dataPagamento=iso(data); renderFinanceiro(); renderRelatorios(); toast('Parcela baixada.','ok');
+    p.status='PAGO'; p.dataPagamento=iso(data); S.versao='';
+    renderFinanceiro(); renderRelatorios(); toast('Parcela baixada.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 async function reabrirParcela(id){
   const p = S.financeiro.find(x=>x.id===id);
   try{ carregando(true,'Reabrindo…');
     await api('atualizarParcela',{id, status:'ABERTO', dataPagamento:''});
-    p.status='ABERTO'; p.dataPagamento=''; renderFinanceiro(); renderRelatorios(); toast('Parcela reaberta.','ok');
+    p.status='ABERTO'; p.dataPagamento=''; S.versao='';
+    renderFinanceiro(); renderRelatorios(); toast('Parcela reaberta.','ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 function exportarCsvFinanceiro(){
@@ -4352,6 +4535,246 @@ function exportarCsvMapa(){
   l.push(['TOTAL','', ...d.filiais.map(f=> d.lista.reduce((a,x)=>a+num(x.qtds[f.chave]),0)),
     d.lista.reduce((a,x)=>a+x.total,0)]);
   baixarArquivo('mapa-separacao-'+hoje()+'.csv', csv(l), 'text/csv;charset=utf-8');
+}
+</script>
+
+
+<script>
+/* ========= EDIÇÃO E EXCLUSÃO DE VÁRIAS TRANSFERÊNCIAS ============= */
+function transfSelecionadas(){
+  return S.transferencias.filter(t=>S.selTransf.includes(t.id));
+}
+
+async function excluirSelecionadasTransf(){
+  const sel = transfSelecionadas();
+  if(!sel.length){ toast('Selecione as transferências a excluir.','erro'); return; }
+  const pagas = S.financeiro.filter(f=>S.selTransf.includes(String(f.transferenciaId)) &&
+                                       String(f.status).toUpperCase()==='PAGO');
+  const pecas = sel.reduce((a,t)=>a+num(t.qtdItens),0);
+  const valor = sel.reduce((a,t)=>a+num(t.valorTotal),0);
+  let aviso = 'Excluir '+sel.length+' transferência(s)?\n\n'+
+    'Nº '+sel.map(t=>t.numero).sort().join(', ')+'\n'+
+    inteiro(pecas)+' peças voltam ao estoque do CD • '+moeda(valor)+' sai do financeiro.';
+  if(pagas.length) aviso += '\n\nATENÇÃO: '+pagas.length+' parcela(s) já baixada(s) serão apagadas junto.';
+  if(!confirm(aviso)) return;
+  try{
+    carregando(true,'Excluindo '+sel.length+' transferência(s)…');
+    await api('excluirTransferenciasLote', {ids:S.selTransf, devolverEstoque:true});
+    S.versao=''; S.selTransf=[];
+    await sincronizar(true);
+    toast(sel.length+' transferência(s) excluída(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+function abrirEdicaoLoteTransf(){
+  const sel = transfSelecionadas();
+  if(!sel.length){ toast('Selecione as transferências a editar.','erro'); return; }
+  const filiais = [...new Set(sel.map(t=>t.filialNome))];
+  $('resumoEditLote').innerHTML =
+    `<b>${sel.length} transferência(s)</b> — nº ${esc(sel.map(t=>t.numero).sort().join(', '))}<br>
+     Valor somado: <b>${moeda(sel.reduce((a,t)=>a+num(t.valorTotal),0))}</b><br>
+     Filial(is): ${esc(filiais.slice(0,4).join(', '))}${filiais.length>4?' e mais '+(filiais.length-4):''}`;
+  $('elFilial').innerHTML = '<option value="">manter como está</option>' +
+    S.filiais.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  ['elData','elFilial'].forEach(i=>$(i).value='');
+  $('elRefazerPag').checked = false;
+  $('elForma').value = sel[0].formaPagamento || 'Boleto';
+  $('elParcelas').value = Math.max(1, num(sel[0].qtdParcelas)||1);
+  $('elPrimeiro').value = somarDias(hoje(),30);
+  $('elIntervalo').value = 30;
+  elAtualizarBloco();
+  abrir('modalEditLoteTransf');
+}
+function elAtualizarBloco(){
+  const on = $('elRefazerPag').checked;
+  $('elBlocoPag').style.opacity = on ? '1' : '.45';
+  $('elBlocoPag').style.pointerEvents = on ? 'auto' : 'none';
+}
+$('elRefazerPag').addEventListener('change', elAtualizarBloco);
+
+async function salvarEdicaoLoteTransf(){
+  const sel = transfSelecionadas();
+  if(!sel.length) return;
+  const campos = {};
+  if($('elData').value) campos.data = $('elData').value;
+  const f = S.filiais.find(x=>x.id===$('elFilial').value);
+  if(f){ campos.filialId = f.id; campos.filialNome = f.nome; campos.filialCnpj = f.cnpj||''; }
+
+  let pagamento = null;
+  if($('elRefazerPag').checked){
+    pagamento = { forma:$('elForma').value,
+      parcelas: Math.max(1, Math.min(48, Math.round(num($('elParcelas').value))||1)),
+      primeiro: $('elPrimeiro').value || somarDias(hoje(),30),
+      intervalo: Math.max(1, Math.round(num($('elIntervalo').value))||30) };
+  }
+  if(!Object.keys(campos).length && !pagamento){ toast('Nada para alterar.','erro'); return; }
+
+  const pagas = S.financeiro.filter(x=>S.selTransf.includes(String(x.transferenciaId)) &&
+                                       String(x.status).toUpperCase()==='PAGO');
+  let aviso = 'Aplicar as alterações a '+sel.length+' transferência(s)?';
+  if(pagamento && pagas.length)
+    aviso += '\n\nATENÇÃO: '+pagas.length+' parcela(s) baixada(s) voltarão para EM ABERTO.';
+  if(!confirm(aviso)) return;
+
+  try{
+    carregando(true,'Atualizando '+sel.length+' transferência(s)…');
+    await api('editarTransferenciasLote', {ids:S.selTransf, campos, pagamento});
+    S.versao=''; S.selTransf=[];
+    fechar('modalEditLoteTransf');
+    await sincronizar(true);
+    toast(sel.length+' transferência(s) atualizada(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+</script>
+
+
+<script>
+/* =============== VERIFICAÇÃO E CORREÇÃO DA BASE =================== */
+let diagAtual = null;
+
+async function abrirDiagnostico(){ abrir('modalDiagnostico'); await rodarDiagnostico(); }
+
+async function rodarDiagnostico(){
+  try{
+    carregando(true,'Conferindo a base de dados…');
+    diagAtual = await api('diagnostico', {});
+    renderDiagnostico();
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+function renderDiagnostico(){
+  const d = diagAtual; if(!d) return;
+  const dup = Object.keys(d.duplicados).reduce((a,k)=>a+d.duplicados[k].length,0);
+  const orf = d.itensOrfaos.length + d.parcelasOrfas.length;
+  const div = d.totaisDivergentes.length;
+  const est = d.estoqueDivergente.length;
+  const tudoOk = !dup && !orf && !div && !est && !d.transferenciasSemItens.length;
+
+  $('diagResumo').innerHTML = `
+    <div class="kpis">
+      ${kpi('Lançamentos repetidos', inteiro(dup), dup?'vermelho':'verde')}
+      ${kpi('Itens/parcelas sem transferência', inteiro(orf), orf?'vermelho':'verde')}
+      ${kpi('Totais fora de sincronia', inteiro(div), div?'laranja':'verde')}
+      ${kpi('Produtos com estoque divergente', inteiro(est), est?'laranja':'verde')}
+    </div>
+    ${tudoOk ? '<div class="card card-pad" style="border-left:4px solid var(--verde)"><b>Nenhum problema encontrado.</b> A base está consistente.</div>'
+      : `<div class="card card-pad" style="border-left:4px solid var(--laranja);margin-bottom:16px">
+          <b>Correção automática</b>
+          <p style="color:var(--cinza);font-size:12.5px;margin:8px 0 12px;line-height:1.6">
+            Remove as linhas repetidas (mantendo a primeira de cada), apaga itens e parcelas que
+            ficaram sem transferência e recalcula os totais de cada documento.
+            O estoque não é alterado por aqui — veja a lista abaixo.
+          </p>
+          <button class="btn laranja" onclick="corrigirBase()">Corrigir agora</button>
+        </div>`}`;
+
+  const bloco = (titulo, corpo) => corpo ?
+    `<div class="card" style="margin-bottom:16px">
+       <div class="card-pad" style="border-bottom:1px solid var(--linha)"><h3 style="font-size:14px">${titulo}</h3></div>
+       <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:340px">${corpo}</div>
+     </div>` : '';
+
+  let html = '';
+
+  const listaDup = [];
+  Object.keys(d.duplicados).forEach(k=> d.duplicados[k].forEach(x=> listaDup.push({aba:k, ...x})));
+  if(listaDup.length) html += bloco('Lançamentos repetidos',
+    `<table><thead><tr><th>Aba</th><th>Identificador</th><th class="num">Vezes</th></tr></thead><tbody>
+      ${listaDup.map(x=>`<tr><td><b>${esc(x.aba)}</b></td><td class="mono">${esc(x.id)}</td>
+        <td class="num"><b style="color:var(--vermelho)">${x.vezes}</b></td></tr>`).join('')}
+    </tbody></table>`);
+
+  if(d.itensOrfaos.length) html += bloco('Itens sem transferência (serão apagados)',
+    `<table><thead><tr><th>Código</th><th>Descrição</th><th class="num">Qtde</th></tr></thead><tbody>
+      ${d.itensOrfaos.map(i=>`<tr><td class="mono">${esc(i.codigo)}</td><td>${esc(i.descricao)}</td>
+        <td class="num">${inteiro(i.quantidade)}</td></tr>`).join('')}
+    </tbody></table>`);
+
+  if(d.parcelasOrfas.length) html += bloco('Parcelas sem transferência (serão apagadas)',
+    `<table><thead><tr><th>Documento</th><th>Filial</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
+      ${d.parcelasOrfas.map(f=>`<tr><td class="mono">${esc(f.numeroDoc)}</td><td>${esc(f.filial)}</td>
+        <td class="num">${moeda(f.valor)}</td><td>${esc(f.status)}</td></tr>`).join('')}
+    </tbody></table>`);
+
+  if(d.totaisDivergentes.length) html += bloco('Totais fora de sincronia (serão recalculados)',
+    `<table><thead><tr><th>Nº</th><th>Filial</th><th class="num">Valor no doc.</th>
+      <th class="num">Soma dos itens</th><th class="num">Soma das parcelas</th>
+      <th class="num">Peças doc.</th><th class="num">Peças itens</th></tr></thead><tbody>
+      ${d.totaisDivergentes.map(t=>`<tr><td class="mono"><b>${esc(t.numero)}</b></td><td>${esc(t.filial)}</td>
+        <td class="num">${moeda(t.valorDoc)}</td><td class="num"><b>${moeda(t.valorItens)}</b></td>
+        <td class="num">${moeda(t.valorParcelas)}</td>
+        <td class="num">${inteiro(t.qtdDoc)}</td><td class="num"><b>${inteiro(t.qtdItens)}</b></td></tr>`).join('')}
+    </tbody></table>`);
+
+  if(d.transferenciasSemItens.length) html += bloco('Transferências sem nenhum item',
+    `<table><thead><tr><th>Nº</th><th>Filial</th><th class="num">Ação</th></tr></thead><tbody>
+      ${d.transferenciasSemItens.map(t=>`<tr><td class="mono"><b>${esc(t.numero)}</b></td><td>${esc(t.filial)}</td>
+        <td class="num"><button class="btn mini perigo" onclick="excluirTransferenciaDiag('${t.id}','${esc(t.numero)}')">Excluir</button></td></tr>`).join('')}
+    </tbody></table>`);
+
+  if(d.estoqueDivergente.length) html += `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-pad" style="border-bottom:1px solid var(--linha);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <h3 style="font-size:14px">Estoque divergente</h3>
+        <span style="font-size:12px;color:var(--cinza)">esperado = total recebido − total transferido</span>
+        <div class="espaco"></div>
+        <button class="btn laranja" onclick="aplicarEstoqueEsperado()">Aplicar o estoque esperado a todos</button>
+      </div>
+      <div class="tabela-wrap" style="border:0;box-shadow:none;max-height:420px">
+        <table><thead><tr><th>Código</th><th>Descrição</th><th class="num">Recebido</th>
+          <th class="num">Transferido</th><th class="num">Estoque atual</th><th class="num">Esperado</th>
+          <th class="num">Diferença</th></tr></thead><tbody>
+          ${d.estoqueDivergente.map(x=>{ const dif = x.atual - x.esperado;
+            return `<tr><td class="mono"><b>${esc(x.codigo)}</b></td><td>${esc(x.descricao)}</td>
+              <td class="num">${inteiro(x.recebido)}</td><td class="num">${inteiro(x.transferido)}</td>
+              <td class="num">${inteiro(x.atual)}</td><td class="num"><b>${inteiro(x.esperado)}</b></td>
+              <td class="num"><b style="color:${dif>0?'var(--vermelho)':'var(--azul)'}">${dif>0?'+':''}${inteiro(dif)}</b></td></tr>`;
+          }).join('')}
+        </tbody></table>
+      </div>
+      <div class="card-pad" style="color:var(--cinza);font-size:12px;line-height:1.6">
+        Diferença positiva costuma indicar estoque devolvido mais de uma vez (exclusão repetida);
+        negativa, recebimento ainda não lançado. Só aparecem aqui os produtos que têm recebimento registrado.
+      </div>
+    </div>`;
+
+  $('diagDetalhes').innerHTML = html;
+}
+
+async function corrigirBase(){
+  if(!confirm('Corrigir a base agora?\n\nSerão removidas as linhas repetidas e os itens/parcelas sem transferência, e os totais serão recalculados.')) return;
+  try{
+    carregando(true,'Corrigindo a base…');
+    const r = await api('corrigirBase', {removerDuplicadas:true, removerOrfaos:true, recalcularTotais:true});
+    S.versao='';
+    await sincronizar(true);
+    await rodarDiagnostico();
+    toast(`Corrigido: ${r.duplicadas} repetida(s), ${r.orfaos} órfão(s), ${r.totais} total(is).`,'ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+async function aplicarEstoqueEsperado(){
+  if(!diagAtual || !diagAtual.estoqueDivergente.length) return;
+  const n = diagAtual.estoqueDivergente.length;
+  if(!confirm('Gravar o estoque esperado em '+n+' produto(s)?\n\nO valor passa a ser: total recebido − total transferido.')) return;
+  try{
+    carregando(true,'Ajustando o estoque de '+n+' produto(s)…');
+    await api('ajustarEstoqueLote', {itens: diagAtual.estoqueDivergente.map(x=>({id:x.id, quantidade:x.esperado}))});
+    S.versao='';
+    await sincronizar(true);
+    await rodarDiagnostico();
+    toast(n+' produto(s) ajustado(s).','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
+}
+
+async function excluirTransferenciaDiag(id, numero){
+  if(!confirm('Excluir a transferência nº '+numero+' (sem itens)?')) return;
+  try{
+    carregando(true,'Excluindo…');
+    await api('excluirTransferenciasLote', {ids:[id], devolverEstoque:false});
+    S.versao=''; await sincronizar(true); await rodarDiagnostico();
+    toast('Transferência excluída.','ok');
+  }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 </script>
 
