@@ -1056,10 +1056,13 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
     <div class="modal-corpo">
       <div class="tabela-wrap" style="max-height:300px;margin-bottom:18px">
         <table><thead><tr><th>Data</th><th class="num">Quantidade</th><th>Container / lote</th><th>Obs.</th>
-          <th class="num" style="width:60px"></th></tr></thead>
+          <th class="num" style="width:120px">Ações</th></tr></thead>
           <tbody id="tbRecebimentos"></tbody><tfoot id="tfRecebimentos"></tfoot></table>
       </div>
-      <h3 style="font-size:14px;margin-bottom:12px">Lançar novo recebimento</h3>
+      <h3 style="font-size:14px;margin-bottom:12px" id="tituloFormReceb">Lançar novo recebimento</h3>
+      <input type="hidden" id="recId">
+      <div id="avisoEdicaoReceb" style="display:none;background:#fff7ef;border-left:4px solid var(--laranja);
+           padding:10px 12px;border-radius:0 8px 8px 0;font-size:12.5px;margin-bottom:12px"></div>
       <div class="grid g2">
         <div class="campo"><label>Data do recebimento</label><input type="date" id="recData"></div>
         <div class="campo"><label>Quantidade recebida</label><input type="number" id="recQtd" step="1" placeholder="ex.: 600"></div>
@@ -1069,12 +1072,14 @@ th.ord.desc::after{content:' ↓';opacity:1;color:var(--laranja)}
         <div class="campo"><label>Observação</label><input type="text" id="recObs"></div>
       </div>
       <label style="text-transform:none;letter-spacing:0;font-size:12.5px;display:flex;gap:8px;align-items:center">
-        <input type="checkbox" id="recSomar" checked style="width:auto"> Somar esta quantidade ao estoque do CD
+        <input type="checkbox" id="recSomar" checked style="width:auto">
+        <span id="rotuloRecSomar">Somar esta quantidade ao estoque do CD</span>
       </label>
     </div>
     <div class="modal-rodape">
+      <button class="btn" id="btnCancelarEdicaoReceb" style="display:none" onclick="cancelarEdicaoRecebimento()">Cancelar edição</button>
       <button class="btn" onclick="fechar('modalRecebimentos')">Fechar</button>
-      <button class="btn principal" onclick="salvarRecebimento()">Lançar recebimento</button>
+      <button class="btn principal" id="btnSalvarReceb" onclick="salvarRecebimento()">Lançar recebimento</button>
     </div>
   </div>
 </div>
@@ -1798,8 +1803,7 @@ function abrirRecebimentos(id){
   const p = S.produtos.find(x=>x.id===id); if(!p) return;
   produtoReceb = id;
   $('tituloReceb').textContent = 'Recebimentos • '+p.codigo+' — '+p.descricao;
-  $('recData').value = hoje(); $('recQtd').value=''; $('recContainer').value=''; $('recObs').value='';
-  $('recSomar').checked = true;
+  limparFormRecebimento();
   renderRecebimentos(); abrir('modalRecebimentos');
 }
 function renderRecebimentos(){
@@ -1811,7 +1815,10 @@ function renderRecebimentos(){
       <td class="num"><b>${inteiro(r.quantidade)}</b> un</td>
       <td class="mono">${esc(r.container||'—')}</td>
       <td>${esc(r.obs||'')}</td>
-      <td class="num"><button class="btn mini perigo" onclick="excluirRecebimento('${r.id}')">×</button></td>
+      <td class="num">
+        <button class="btn mini" onclick="editarRecebimento('${r.id}')">Editar</button>
+        <button class="btn mini perigo" onclick="excluirRecebimento('${r.id}')">×</button>
+      </td>
     </tr>`).join('')
     : '<tr><td colspan="5"><div class="vazio">Nenhum recebimento lançado para este produto.</div></td></tr>';
   const total = lista.reduce((a,r)=>a+num(r.quantidade),0);
@@ -1834,22 +1841,86 @@ function atualizarResumoRecProduto(){
       : '<span>Nenhum recebimento lançado.</span>')
     + `<button class="btn mini" onclick="abrirRecebimentos('${p.id}')">Ver histórico / lançar</button>`;
 }
+function limparFormRecebimento(){
+  $('recId').value=''; $('recData').value = hoje();
+  $('recQtd').value=''; $('recContainer').value=''; $('recObs').value='';
+  $('recSomar').checked = true;
+  $('tituloFormReceb').textContent = 'Lançar novo recebimento';
+  $('btnSalvarReceb').textContent = 'Lançar recebimento';
+  $('rotuloRecSomar').textContent = 'Somar esta quantidade ao estoque do CD';
+  $('avisoEdicaoReceb').style.display = 'none';
+  $('btnCancelarEdicaoReceb').style.display = 'none';
+}
+function cancelarEdicaoRecebimento(){ limparFormRecebimento(); }
+
+function editarRecebimento(id){
+  const r = S.recebimentos.find(x=>x.id===id); if(!r) return;
+  $('recId').value = r.id;
+  $('recData').value = iso(r.data);
+  $('recQtd').value = num(r.quantidade);
+  $('recContainer').value = r.container || '';
+  $('recObs').value = r.obs || '';
+  $('recSomar').checked = true;
+  $('tituloFormReceb').textContent = 'Editar recebimento de '+dataBR(r.data);
+  $('btnSalvarReceb').textContent = 'Salvar alterações';
+  $('rotuloRecSomar').textContent = 'Aplicar a diferença ao estoque do CD';
+  $('avisoEdicaoReceb').style.display = 'block';
+  $('btnCancelarEdicaoReceb').style.display = 'inline-flex';
+  atualizarAvisoEdicaoReceb();
+  $('recQtd').focus(); $('recQtd').select();
+}
+
+/* mostra, enquanto digita, como o estoque fica após a correção */
+function atualizarAvisoEdicaoReceb(){
+  const id = $('recId').value; if(!id) return;
+  const r = S.recebimentos.find(x=>x.id===id); if(!r) return;
+  const p = S.produtos.find(x=>x.id===produtoReceb); if(!p) return;
+  const nova = num($('recQtd').value), antiga = num(r.quantidade), dif = nova - antiga;
+  const aplicar = $('recSomar').checked;
+  $('avisoEdicaoReceb').innerHTML =
+    `Quantidade registrada: <b>${inteiro(antiga)}</b> un → nova: <b>${inteiro(nova)}</b> un
+     (${dif===0?'sem diferença':((dif>0?'+':'')+inteiro(dif)+' un')})<br>` +
+    (aplicar
+      ? `Estoque do CD: <b>${inteiro(p.quantidade)}</b> → <b>${inteiro(num(p.quantidade)+dif)}</b> un`
+      : `<span style="color:var(--cinza)">O estoque do CD ficará em ${inteiro(p.quantidade)} un (sem alteração).</span>`);
+}
+['recQtd','recSomar'].forEach(id=>$(id).addEventListener('input', atualizarAvisoEdicaoReceb));
+$('recSomar').addEventListener('change', atualizarAvisoEdicaoReceb);
+
 async function salvarRecebimento(){
   const p = S.produtos.find(x=>x.id===produtoReceb); if(!p) return;
   const qtd = num($('recQtd').value);
   if(qtd<=0){ toast('Informe a quantidade recebida.','erro'); return; }
   const somar = $('recSomar').checked;
-  const recebimento = { id:'', produtoId:p.id, codigo:p.codigo, data:$('recData').value||hoje(),
+  const editando = $('recId').value;
+  const recebimento = { id: editando || '', produtoId:p.id, codigo:p.codigo, data:$('recData').value||hoje(),
     quantidade:qtd, container:$('recContainer').value.trim(), obs:$('recObs').value.trim() };
+
+  if(editando){
+    const antigo = S.recebimentos.find(x=>x.id===editando);
+    const dif = qtd - num(antigo.quantidade);
+    if(somar && dif!==0 && num(p.quantidade)+dif < 0){
+      toast('O estoque ficaria negativo ('+inteiro(num(p.quantidade)+dif)+' un). Ajuste a quantidade.','erro'); return;
+    }
+    if(somar && dif!==0 && !confirm('Salvar a correção?\n\nQuantidade: '+inteiro(antigo.quantidade)+
+       ' → '+inteiro(qtd)+' un\nEstoque do CD: '+inteiro(p.quantidade)+' → '+inteiro(num(p.quantidade)+dif)+' un')) return;
+  }
+
   try{
-    carregando(true,'Lançando recebimento…');
+    carregando(true, editando ? 'Salvando correção…' : 'Lançando recebimento…');
     const r = await api('salvarRecebimento',{recebimento, somarEstoque:somar});
-    S.recebimentos.push(r.recebimento);
+    if(editando){
+      const i = S.recebimentos.findIndex(x=>x.id===editando);
+      if(i>=0) S.recebimentos[i] = r.recebimento;
+    } else {
+      S.recebimentos.push(r.recebimento);
+    }
     if(somar && r.quantidade !== null && r.quantidade !== undefined) p.quantidade = r.quantidade;
     S.versao='';
-    $('recQtd').value=''; $('recContainer').value=''; $('recObs').value='';
+    limparFormRecebimento();
     renderRecebimentos(); renderProdutos();
-    toast('Recebimento lançado.'+(somar?' Estoque atualizado para '+inteiro(p.quantidade)+' un.':''),'ok');
+    toast((editando?'Recebimento corrigido.':'Recebimento lançado.')+
+      (somar?' Estoque: '+inteiro(p.quantidade)+' un.':''),'ok');
   }catch(e){ toast('Erro: '+e.message,'erro'); } finally{ carregando(false); }
 }
 async function excluirRecebimento(id){
